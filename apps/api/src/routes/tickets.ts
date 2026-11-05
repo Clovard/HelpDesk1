@@ -73,10 +73,15 @@ tickets.post("/", async (context) => {
     body,
     );
 
+    const ticket = await getTicketById(
+    context.env,
+    Number(result.id),
+    );
+
     return context.json(
     {
         ok: true,
-        ...result,
+        ticket,
     },
     201,
     );

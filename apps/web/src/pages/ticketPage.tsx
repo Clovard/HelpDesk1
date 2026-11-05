@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getTickets, updateTicket } from "../api/client";
 import TicketDetailsPanel from "../components/TicketDetailsPanel";
+import CreateTicketPanel from "../components/CreateTicketPanel";
 import KanbanPage from "./kanbanPage";
 import type { Ticket, TicketStatus } from "../types";
 
@@ -21,6 +22,7 @@ export default function TicketPage() {
     const [error, setError] = useState("");
     const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
     const [displayMode, setDisplayMode] = useState<"list" | "kanban">("list");
+    const [createOpen, setCreateOpen] = useState(false);
 
     async function loadTickets() {
         try {
@@ -62,7 +64,7 @@ export default function TicketPage() {
                     <h1>Заявки</h1>
                     <p className="subtitle">Запросы в службу поддержки из внутренней системы</p>
                 </div>
-                <button className="refresh-button" onClick={() => void loadTickets()}>↻ Обновить</button>
+                <div className="header-actions"><button className="secondary-button" onClick={() => setCreateOpen(true)}>＋ Создать заявку</button><button className="refresh-button" onClick={() => void loadTickets()}>↻ Обновить</button></div>
             </header>
 
             <section className="toolbar">
@@ -177,6 +179,7 @@ export default function TicketPage() {
                     onDeleted={(deletedId) => setTickets((current) => current.filter((item) => item.id !== deletedId))}
                 />
             )}
+            {createOpen && <CreateTicketPanel onClose={() => setCreateOpen(false)} onCreated={(createdTicket) => setTickets((current) => [createdTicket, ...current])} />}
         </main>
     );
 }

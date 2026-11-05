@@ -41,6 +41,22 @@ export async function getTickets() {
     return request<{ ok: boolean; tickets: Ticket[] }>("/api/tickets");
 }
 
+export async function createTicket(data: {
+    employee: string;
+    city?: string;
+    department?: string;
+    system?: string;
+    type?: string;
+    problem: string;
+    expectedResult?: string;
+    scale?: string;
+}) {
+    return request<{ ok: boolean; ticket: Ticket }>("/api/tickets", {
+        method: "POST",
+        body: JSON.stringify(data),
+    });
+}
+
 export async function updateTicket(id: number, data: {
     date?: string;
     time?: string;

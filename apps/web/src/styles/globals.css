@@ -39,6 +39,7 @@ h1 { margin: 0; color: #102b60; font-size: 39px; letter-spacing: -.03em; }
 .subtitle { margin: 8px 0 0; color: #718096; font-size: 14px; }
 .refresh-button { padding: 13px 18px; color: #ffffff; background: linear-gradient(135deg, #1e72ff, #0d54d9); border: 0; border-radius: 10px; box-shadow: 0 9px 22px #1769ed38; font-weight: 800; }
 .refresh-button:hover { background: #175bc2; }
+.header-actions { display: flex; align-items: center; gap: 10px; }
 
 .toolbar { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
 .search-input { width: 340px; padding: 11px 14px; color: #172033; background: #ffffff; border: 1px solid #d9e0e8; border-radius: 8px; outline: none; }
