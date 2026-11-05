@@ -38,5 +38,19 @@ replyMarkup?: unknown,
     },
     );
 
-    return response.json();
+    const result = await response.json() as {
+        ok?: boolean;
+        description?: string;
+        error_code?: number;
+    };
+
+    if (!response.ok || result.ok === false) {
+        console.error("Telegram sendMessage failed", {
+            status: response.status,
+            errorCode: result.error_code,
+            description: result.description,
+        });
+    }
+
+    return result;
 }
