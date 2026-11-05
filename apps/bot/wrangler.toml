@@ -5,7 +5,7 @@ compatibility_date = "2026-11-04"
 [[d1_databases]]
 binding = "DB"
 database_name = "helpdesk-db"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "f25dcb55-4ad5-4465-9f47-e53f12a8e6a9"
 
 [vars]
-API_URL = "https://helpdesk-api.example.workers.dev"
+API_URL = "https://it-help-panel.andrejsarafonov.workers.dev"

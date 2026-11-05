@@ -7,7 +7,7 @@ createUser,
 getUserById,
 listUsers,
 updateUser,
-} from "../services/user.service";
+} from "../services/user.services";
 
 const users = new Hono<{ Bindings: Env }>();
 
