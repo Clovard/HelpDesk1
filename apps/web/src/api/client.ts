@@ -17,7 +17,7 @@ export type Idea = {
     comment: string | null;
 };
 
-const API_URL = import.meta.env.VITE_API_URL || "https://it-help-panel.andrejsarafonov.workers.dev";
+const API_URL = import.meta.env.VITE_API_URL || "https://helpdesk-api.andrejsarafonov.workers.dev";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
     const response = await fetch(API_URL + path, {
