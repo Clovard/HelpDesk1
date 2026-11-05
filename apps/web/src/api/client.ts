@@ -42,15 +42,30 @@ export async function getTickets() {
 }
 
 export async function updateTicket(id: number, data: {
+    date?: string;
+    time?: string;
+    employee?: string;
+    city?: string | null;
+    department?: string | null;
+    system?: string | null;
+    type?: string | null;
+    problem?: string;
+    expectedResult?: string | null;
     status?: string;
-    itComment?: string;
+    itComment?: string | null;
     supportLevel?: string | null;
     assignee?: string | null;
-    scale?: string;
+    scale?: string | null;
 }) {
     return request<{ ok: boolean; ticket: Ticket }>("/api/tickets/" + id, {
         method: "PATCH",
         body: JSON.stringify(data),
+    });
+}
+
+export async function deleteTicket(id: number) {
+    return request<{ ok: boolean; deleted: boolean; id: number }>("/api/tickets/" + id, {
+        method: "DELETE",
     });
 }
 

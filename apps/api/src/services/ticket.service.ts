@@ -12,11 +12,20 @@ export type CreateTicketInput = {
 };
 
 export type UpdateTicketInput = {
+    date?: string;
+    time?: string;
+    employee?: string;
+    city?: string | null;
+    department?: string | null;
+    system?: string | null;
+    type?: string | null;
+    problem?: string;
+    expectedResult?: string | null;
     status?: string;
-    itComment?: string;
+    itComment?: string | null;
     supportLevel?: "L1" | "L2" | "L3" | null;
     assignee?: string | null;
-    scale?: string;
+    scale?: string | null;
 };
 
 export async function listTickets(env: Env) {
@@ -106,18 +115,22 @@ input: UpdateTicketInput,
 ) {
     const current = await env.DB.prepare(
     `
-      SELECT
-        status,
-        it_comment,
-        support_level,
-        assignee,
-        scale
+      SELECT *
       FROM tickets
       WHERE id = ?
     `,
     )
     .bind(id)
     .first<{
+    date: string;
+    time: string;
+    employee: string;
+    city: string | null;
+    department: string | null;
+    system: string | null;
+    type: string | null;
+    problem: string;
+    expected_result: string | null;
     status: string;
     it_comment: string | null;
     support_level: string | null;
@@ -129,29 +142,34 @@ input: UpdateTicketInput,
         return null;
     }
 
-    const nextStatus =
-    input.status ?? current.status;
-
-    const nextComment =
-    input.itComment ?? current.it_comment;
-
-    const nextLevel =
-    input.supportLevel === undefined
-    ? current.support_level
-    : input.supportLevel;
-
-    const nextAssignee =
-    input.assignee === undefined
-    ? current.assignee
-    : input.assignee;
-
-    const nextScale =
-    input.scale ?? current.scale;
+    const nextDate = input.date ?? current.date;
+    const nextTime = input.time ?? current.time;
+    const nextEmployee = input.employee ?? current.employee;
+    const nextCity = input.city === undefined ? current.city : input.city;
+    const nextDepartment = input.department === undefined ? current.department : input.department;
+    const nextSystem = input.system === undefined ? current.system : input.system;
+    const nextType = input.type === undefined ? current.type : input.type;
+    const nextProblem = input.problem ?? current.problem;
+    const nextExpectedResult = input.expectedResult === undefined ? current.expected_result : input.expectedResult;
+    const nextStatus = input.status ?? current.status;
+    const nextComment = input.itComment === undefined ? current.it_comment : input.itComment;
+    const nextLevel = input.supportLevel === undefined ? current.support_level : input.supportLevel;
+    const nextAssignee = input.assignee === undefined ? current.assignee : input.assignee;
+    const nextScale = input.scale === undefined ? current.scale : input.scale;
 
     await env.DB.prepare(
     `
       UPDATE tickets
       SET
+        date = ?,
+        time = ?,
+        employee = ?,
+        city = ?,
+        department = ?,
+        system = ?,
+        type = ?,
+        problem = ?,
+        expected_result = ?,
         status = ?,
         it_comment = ?,
         support_level = ?,
@@ -167,6 +185,15 @@ input: UpdateTicketInput,
     `,
     )
     .bind(
+    nextDate,
+    nextTime,
+    nextEmployee,
+    nextCity,
+    nextDepartment,
+    nextSystem,
+    nextType,
+    nextProblem,
+    nextExpectedResult,
     nextStatus,
     nextComment,
     nextLevel,
@@ -201,4 +228,14 @@ input: UpdateTicketInput,
     }
 
     return getTicketById(env, id);
+}
+
+export async function deleteTicket(env: Env, id: number) {
+    const result = await env.DB.prepare(
+    `DELETE FROM tickets WHERE id = ?`,
+    )
+    .bind(id)
+    .run();
+
+    return result.meta.changes > 0;
 }

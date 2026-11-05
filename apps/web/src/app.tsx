@@ -1,9 +1,9 @@
 import { useState } from "react";
 import TicketPage from "./pages/ticketPage";
 import IdeasPage from "./pages/ideasPage";
-import KanbanPage from "./pages/kanbanPage";
+import SettingsPage from "./pages/settingsPage";
 
-type View = "tickets" | "ideas" | "kanban";
+type View = "tickets" | "ideas" | "settings";
 
 export default function App() {
     const [view, setView] = useState<View>("tickets");
@@ -14,25 +14,24 @@ export default function App() {
                 <div className="brand">
                     <div className="brand-mark">IT</div>
                     <div>
-                        <strong>IT Helpdesk</strong>
-                        <span>Operations Center</span>
+                        <strong>Служба технической поддержки</strong>
+                        <span>Операционный центр</span>
                     </div>
                 </div>
                 <nav className="sidebar-nav">
-                    <button className={view === "tickets" ? "nav-link active" : "nav-link"} onClick={() => setView("tickets")}>Tickets</button>
-                    <button className={view === "ideas" ? "nav-link active" : "nav-link"} onClick={() => setView("ideas")}>Ideas</button>
-                    <button className={view === "kanban" ? "nav-link active" : "nav-link"} onClick={() => setView("kanban")}>Kanban</button>
-                    <button className="nav-link" onClick={() => window.alert("Settings are next.")}>Settings</button>
+                    <button className={view === "tickets" ? "nav-link active" : "nav-link"} onClick={() => setView("tickets")}>▣ &nbsp;Заявки</button>
+                    <button className={view === "ideas" ? "nav-link active" : "nav-link"} onClick={() => setView("ideas")}>♧ &nbsp;Идеи</button>
+                    <button className={view === "settings" ? "nav-link active" : "nav-link"} onClick={() => setView("settings")}>⚙ &nbsp;Настройки</button>
                 </nav>
                 <div className="sidebar-footer">
                     <span className="online-dot" />
-                    API connection pending
+                    Подключение API
                 </div>
             </aside>
             <section className="content">
                 {view === "tickets" && <TicketPage />}
                 {view === "ideas" && <IdeasPage />}
-                {view === "kanban" && <KanbanPage />}
+                {view === "settings" && <SettingsPage />}
             </section>
         </div>
     );

@@ -4,6 +4,7 @@ import type { Env } from "../db/client";
 
 import {
 createTicket,
+deleteTicket,
 getTicketById,
 listTickets,
 updateTicket,
@@ -115,6 +116,38 @@ tickets.patch("/:id", async (context) => {
     return context.json({
         ok: true,
         ticket,
+    });
+});
+
+tickets.delete("/:id", async (context) => {
+    const id = Number(context.req.param("id"));
+
+    if (!Number.isInteger(id)) {
+        return context.json(
+        {
+            ok: false,
+            error: "Invalid ticket ID",
+        },
+        400,
+        );
+    }
+
+    const deleted = await deleteTicket(context.env, id);
+
+    if (!deleted) {
+        return context.json(
+        {
+            ok: false,
+            error: "Ticket not found",
+        },
+        404,
+        );
+    }
+
+    return context.json({
+        ok: true,
+        deleted: true,
+        id,
     });
 });
 

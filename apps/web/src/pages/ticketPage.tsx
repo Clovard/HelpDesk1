@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getTickets, updateTicket } from "../api/client";
+import TicketDetailsPanel from "../components/TicketDetailsPanel";
+import KanbanPage from "./kanbanPage";
 import type { Ticket, TicketStatus } from "../types";
 
 const statuses: TicketStatus[] = [
@@ -17,6 +19,8 @@ export default function TicketPage() {
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+    const [displayMode, setDisplayMode] = useState<"list" | "kanban">("list");
 
     async function loadTickets() {
         try {
@@ -41,7 +45,7 @@ export default function TicketPage() {
         return tickets.filter((ticket) => JSON.stringify(ticket).toLowerCase().includes(query));
     }, [tickets, search]);
 
-    async function changeTicket(id: number, data: Record<string, string | null>) {
+    async function changeTicket(id: number, data: Parameters<typeof updateTicket>[1]) {
         try {
             const result = await updateTicket(id, data);
             setTickets((current) => current.map((ticket) => ticket.id === id ? result.ticket : ticket));
@@ -54,11 +58,11 @@ export default function TicketPage() {
         <main className="page">
             <header className="page-header">
                 <div>
-                    <p className="eyebrow">IT OPERATIONS</p>
-                    <h1>Tickets</h1>
-                    <p className="subtitle">Helpdesk requests from the internal support system</p>
+                    <p className="eyebrow">IT-ОПЕРАЦИИ</p>
+                    <h1>Заявки</h1>
+                    <p className="subtitle">Запросы в службу поддержки из внутренней системы</p>
                 </div>
-                <button className="refresh-button" onClick={() => void loadTickets()}>Refresh</button>
+                <button className="refresh-button" onClick={() => void loadTickets()}>↻ Обновить</button>
             </header>
 
             <section className="toolbar">
@@ -66,40 +70,44 @@ export default function TicketPage() {
                     className="search-input"
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search tickets..."
+                    placeholder="Поиск заявок..."
                 />
-                <span className="ticket-count">{visibleTickets.length} tickets</span>
+                <span className="ticket-count">{visibleTickets.length} заявок</span>
+                <div className="view-switcher">
+                    <button className={displayMode === "list" ? "view-button active" : "view-button"} onClick={() => setDisplayMode("list")}>Список</button>
+                    <button className={displayMode === "kanban" ? "view-button active" : "view-button"} onClick={() => setDisplayMode("kanban")}>Канбан</button>
+                </div>
             </section>
 
-            {loading && <div className="state-card">Loading tickets...</div>}
+            {loading && <div className="state-card">Загрузка заявок...</div>}
             {error && <div className="state-card error-card">{error}</div>}
 
-            {!loading && !error && (
+            {displayMode === "list" && !loading && !error && (
             <section className="table-card">
                 <div className="table-scroll">
                     <table className="tickets-table">
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>Date</th>
-                                <th>Time</th>
-                                <th>Employee</th>
-                                <th>City</th>
-                                <th>Department</th>
-                                <th>System</th>
-                                <th>Type</th>
-                                <th>Problem / Situation</th>
-                                <th>Expected Result</th>
-                                <th>IT Status</th>
-                                <th>IT Comment</th>
-                                <th>Level</th>
-                                <th>Assignee</th>
-                                <th>Scale</th>
+                                <th>Дата</th>
+                                <th>Время</th>
+                                <th>Сотрудник</th>
+                                <th>Город</th>
+                                <th>Подразделение</th>
+                                <th>Система</th>
+                                <th>Тип</th>
+                                <th>Проблема / ситуация</th>
+                                <th>Ожидаемый результат</th>
+                                <th>Статус IT</th>
+                                <th>Комментарий IT</th>
+                                <th>Уровень</th>
+                                <th>Ответственный</th>
+                                <th>Масштаб</th>
                             </tr>
                         </thead>
                         <tbody>
                             {visibleTickets.map((ticket) => (
-                            <tr key={ticket.id}>
+                            <tr key={ticket.id} className="clickable-row" onClick={() => setSelectedTicket(ticket)}>
                                 <td className="id-cell">{ticket.public_id}</td>
                                 <td>{ticket.date}</td>
                                 <td>{ticket.time}</td>
@@ -154,9 +162,21 @@ export default function TicketPage() {
                         </tbody>
                     </table>
                 </div>
-                {!visibleTickets.length && <div className="empty-state">No tickets found.</div>}
+                {!visibleTickets.length && <div className="empty-state">Заявки не найдены</div>}
             </section>
         )}
+            {displayMode === "kanban" && !loading && !error && <KanbanPage />}
+            {selectedTicket && (
+                <TicketDetailsPanel
+                    ticket={selectedTicket}
+                    onClose={() => setSelectedTicket(null)}
+                    onSaved={(updatedTicket) => {
+                        setTickets((current) => current.map((item) => item.id === updatedTicket.id ? updatedTicket : item));
+                        setSelectedTicket(updatedTicket);
+                    }}
+                    onDeleted={(deletedId) => setTickets((current) => current.filter((item) => item.id !== deletedId))}
+                />
+            )}
         </main>
     );
 }
