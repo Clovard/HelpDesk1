@@ -8,14 +8,29 @@ const columns: TicketStatus[] = ["New", "Under Review", "In Progress", "Closed"]
 export default function KanbanPage() {
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+    const [draggedTicketId, setDraggedTicketId] = useState<number | null>(null);
+    const [dragOverStatus, setDragOverStatus] = useState<TicketStatus | null>(null);
 
     useEffect(() => {
         void getTickets().then((result) => setTickets(result.tickets)).catch(() => setTickets([]));
     }, []);
 
     async function moveTicket(ticket: Ticket, status: TicketStatus) {
-        const result = await updateTicket(ticket.id, { status });
-        setTickets((current) => current.map((item) => item.id === ticket.id ? result.ticket : item));
+        try {
+            const result = await updateTicket(ticket.id, { status });
+            setTickets((current) => current.map((item) => item.id === ticket.id ? result.ticket : item));
+        } catch (requestError) {
+            window.alert(requestError instanceof Error ? requestError.message : "Не удалось изменить статус");
+        }
+    }
+
+    async function dropTicket(status: TicketStatus) {
+        if (draggedTicketId === null) return;
+        const ticket = tickets.find((item) => item.id === draggedTicketId);
+        setDraggedTicketId(null);
+        setDragOverStatus(null);
+        if (!ticket || ticket.status === status) return;
+        await moveTicket(ticket, status);
     }
 
     return (
@@ -29,20 +44,31 @@ export default function KanbanPage() {
             </header>
             <section className="kanban-board">
                 {columns.map((status) => (
-                <div className="kanban-column" key={status}>
+                <div
+                    className={dragOverStatus === status ? "kanban-column drag-over" : "kanban-column"}
+                    key={status}
+                    onDragOver={(event) => { event.preventDefault(); setDragOverStatus(status); }}
+                    onDragLeave={() => setDragOverStatus(null)}
+                    onDrop={() => void dropTicket(status)}
+                >
                     <div className="kanban-column-header">
                         <strong>{status}</strong>
                         <span>{tickets.filter((ticket) => ticket.status === status).length}</span>
                     </div>
                     <div className="kanban-cards">
                         {tickets.filter((ticket) => ticket.status === status).map((ticket) => (
-                        <article className="kanban-card" key={ticket.id} onClick={() => setSelectedTicket(ticket)}>
+                        <article
+                            className={draggedTicketId === ticket.id ? "kanban-card dragging" : "kanban-card"}
+                            key={ticket.id}
+                            draggable
+                            onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; setDraggedTicketId(ticket.id); }}
+                            onDragEnd={() => { setDraggedTicketId(null); setDragOverStatus(null); }}
+                            onClick={() => setSelectedTicket(ticket)}
+                        >
                             <div className="kanban-card-top"><strong>{ticket.public_id}</strong><span className="level-badge">{ticket.support_level || "—"}</span></div>
                             <p>{ticket.problem}</p>
                             <small>{ticket.assignee || "Не назначен"} · {ticket.employee}</small>
-                            <select value={ticket.status} onClick={(event) => event.stopPropagation()} onChange={(event) => void moveTicket(ticket, event.target.value as TicketStatus)}>
-                                {columns.map((option) => <option key={option} value={option}>{option}</option>)}
-                            </select>
+                            <span className="drag-hint">Перетащите, чтобы изменить статус</span>
                         </article>
                     ))}
                         {!tickets.some((ticket) => ticket.status === status) && <div className="kanban-empty">Нет заявок</div>}
