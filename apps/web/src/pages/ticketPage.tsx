@@ -47,6 +47,10 @@ export default function TicketPage() {
         return tickets.filter((ticket) => JSON.stringify(ticket).toLowerCase().includes(query));
     }, [tickets, search]);
 
+    const newCount = tickets.filter((ticket) => ticket.status === "New").length;
+    const inWorkCount = tickets.filter((ticket) => ticket.status === "Under Review" || ticket.status === "In Progress").length;
+    const closedCount = tickets.filter((ticket) => ticket.status === "Closed").length;
+
     async function changeTicket(id: number, data: Parameters<typeof updateTicket>[1]) {
         try {
             const result = await updateTicket(id, data);
@@ -58,22 +62,27 @@ export default function TicketPage() {
 
     return (
         <main className="page">
+            <div className="topbar">
+                <label className="global-search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск по заявкам, сотрудникам, отделам..." /></label>
+                <div className="profile-menu"><button className="notification-button">♧<i /></button><div className="profile-avatar">ИП</div><strong>Иван Петров</strong><span>⌄</span></div>
+            </div>
             <header className="page-header">
                 <div>
-                    <p className="eyebrow">IT-ОПЕРАЦИИ</p>
+                    <div className="breadcrumb">⌂ &nbsp;Главная</div>
                     <h1>Заявки</h1>
                     <p className="subtitle">Запросы в службу поддержки из внутренней системы</p>
                 </div>
-                <div className="header-actions"><button className="secondary-button" onClick={() => setCreateOpen(true)}>＋ Создать заявку</button><button className="refresh-button" onClick={() => void loadTickets()}>↻ Обновить</button></div>
+                <div className="header-actions"><button className="primary-button create-header-button" onClick={() => setCreateOpen(true)}>＋ Создать заявку <span>⌄</span></button><button className="refresh-button" onClick={() => void loadTickets()}>↻</button></div>
             </header>
 
+            <section className="stats-grid">
+                <article className="stats-card stats-blue"><div className="stats-icon">▤</div><div><strong>{newCount}</strong><span>Новых заявок</span></div><em>↑ +2</em></article>
+                <article className="stats-card stats-purple"><div className="stats-icon">◷</div><div><strong>{inWorkCount}</strong><span>В работе</span></div><em>↑ +1</em></article>
+                <article className="stats-card stats-green"><div className="stats-icon">✓</div><div><strong>{closedCount}</strong><span>Закрыто</span></div><em>↑ +3</em></article>
+                <article className="stats-card stats-orange"><div className="stats-icon">▥</div><div><strong>2 ч 15 мин</strong><span>Среднее время решения</span></div><em>↓ -12%</em></article>
+            </section>
+
             <section className="toolbar">
-                <input
-                    className="search-input"
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Поиск заявок..."
-                />
                 <span className="ticket-count">{visibleTickets.length} заявок</span>
                 <div className="view-switcher">
                     <button className={displayMode === "list" ? "view-button active" : "view-button"} onClick={() => setDisplayMode("list")}>Список</button>
