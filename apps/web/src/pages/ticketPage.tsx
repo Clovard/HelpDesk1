@@ -12,6 +12,13 @@ const statuses: TicketStatus[] = [
 "Closed",
 ];
 
+const statusLabels: Record<TicketStatus, string> = {
+    New: "Новая",
+    "Under Review": "На рассмотрении",
+    "In Progress": "В работе",
+    Closed: "Закрыта",
+};
+
 const levels = ["", "L1", "L2", "L3"];
 const responsibles = ["", "Andrey", "Tema", "Pentagon"];
 
@@ -47,10 +54,6 @@ export default function TicketPage() {
         return tickets.filter((ticket) => JSON.stringify(ticket).toLowerCase().includes(query));
     }, [tickets, search]);
 
-    const newCount = tickets.filter((ticket) => ticket.status === "New").length;
-    const inWorkCount = tickets.filter((ticket) => ticket.status === "Under Review" || ticket.status === "In Progress").length;
-    const closedCount = tickets.filter((ticket) => ticket.status === "Closed").length;
-
     async function changeTicket(id: number, data: Parameters<typeof updateTicket>[1]) {
         try {
             const result = await updateTicket(id, data);
@@ -64,7 +67,6 @@ export default function TicketPage() {
         <main className="page">
             <div className="topbar">
                 <label className="global-search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск по заявкам, сотрудникам, отделам..." /></label>
-                <div className="profile-menu"><button className="notification-button">♧<i /></button><div className="profile-avatar">ИП</div><strong>Иван Петров</strong><span>⌄</span></div>
             </div>
             <header className="page-header">
                 <div>
@@ -72,15 +74,8 @@ export default function TicketPage() {
                     <h1>Заявки</h1>
                     <p className="subtitle">Запросы в службу поддержки из внутренней системы</p>
                 </div>
-                <div className="header-actions"><button className="primary-button create-header-button" onClick={() => setCreateOpen(true)}>＋ Создать заявку <span>⌄</span></button><button className="refresh-button" onClick={() => void loadTickets()}>↻</button></div>
+                <div className="header-actions"><button className="primary-button create-header-button" onClick={() => setCreateOpen(true)}>＋ Создать заявку</button><button className="refresh-button" onClick={() => void loadTickets()} aria-label="Обновить заявки">↻</button></div>
             </header>
-
-            <section className="stats-grid">
-                <article className="stats-card stats-blue"><div className="stats-icon">▤</div><div><strong>{newCount}</strong><span>Новых заявок</span></div><em>↑ +2</em></article>
-                <article className="stats-card stats-purple"><div className="stats-icon">◷</div><div><strong>{inWorkCount}</strong><span>В работе</span></div><em>↑ +1</em></article>
-                <article className="stats-card stats-green"><div className="stats-icon">✓</div><div><strong>{closedCount}</strong><span>Закрыто</span></div><em>↑ +3</em></article>
-                <article className="stats-card stats-orange"><div className="stats-icon">▥</div><div><strong>2 ч 15 мин</strong><span>Среднее время решения</span></div><em>↓ -12%</em></article>
-            </section>
 
             <section className="toolbar">
                 <span className="ticket-count">{visibleTickets.length} заявок</span>
@@ -135,7 +130,7 @@ export default function TicketPage() {
                                         value={ticket.status}
                                         onChange={(event) => void changeTicket(ticket.id, { status: event.target.value })}
                                     >
-                                        {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                                        {statuses.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}
                                     </select>
                                 </td>
                                 <td className="wide-cell">

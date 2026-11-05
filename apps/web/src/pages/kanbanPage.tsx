@@ -5,6 +5,13 @@ import type { Ticket, TicketStatus } from "../types";
 
 const columns: TicketStatus[] = ["New", "Under Review", "In Progress", "Closed"];
 
+const statusLabels: Record<TicketStatus, string> = {
+    New: "Новая",
+    "Under Review": "На рассмотрении",
+    "In Progress": "В работе",
+    Closed: "Закрыта",
+};
+
 export default function KanbanPage() {
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
@@ -52,7 +59,7 @@ export default function KanbanPage() {
                     onDrop={() => void dropTicket(status)}
                 >
                     <div className="kanban-column-header">
-                        <strong>{status}</strong>
+                        <strong>{statusLabels[status]}</strong>
                         <span>{tickets.filter((ticket) => ticket.status === status).length}</span>
                     </div>
                     <div className="kanban-cards">

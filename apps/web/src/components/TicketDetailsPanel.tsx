@@ -3,6 +3,12 @@ import { deleteTicket, updateTicket } from "../api/client";
 import type { Ticket, TicketStatus } from "../types";
 
 const statuses: TicketStatus[] = ["New", "Under Review", "In Progress", "Closed"];
+const statusLabels: Record<TicketStatus, string> = {
+    New: "Новая",
+    "Under Review": "На рассмотрении",
+    "In Progress": "В работе",
+    Closed: "Закрыта",
+};
 const levels = ["", "L1", "L2", "L3"];
 const responsibles = ["", "Andrey", "Tema", "Pentagon"];
 
@@ -175,7 +181,7 @@ export default function TicketDetailsPanel({ ticket, onClose, onSaved, onDeleted
                 <section className="details-section">
                     <h3>Работа IT</h3>
                     <div className="details-grid">
-                        <label className="details-field"><span>Статус</span><select disabled={!editing} value={draft.status} onChange={(event) => setField("status", event.target.value as TicketStatus)}>{statuses.map((status) => <option key={status}>{status}</option>)}</select></label>
+                        <label className="details-field"><span>Статус</span><select disabled={!editing} value={draft.status} onChange={(event) => setField("status", event.target.value as TicketStatus)}>{statuses.map((status) => <option key={status} value={status}>{statusLabels[status]}</option>)}</select></label>
                         <label className="details-field"><span>Уровень</span><select disabled={!editing} value={draft.supportLevel} onChange={(event) => setField("supportLevel", event.target.value)}>{levels.map((level) => <option key={level} value={level}>{level || "—"}</option>)}</select></label>
                         <label className="details-field"><span>Ответственный</span><select disabled={!editing} value={draft.assignee} onChange={(event) => setField("assignee", event.target.value)}>{responsibles.map((person) => <option key={person} value={person}>{person || "—"}</option>)}</select></label>
                     </div>
