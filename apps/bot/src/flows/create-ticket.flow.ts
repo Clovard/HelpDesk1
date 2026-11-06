@@ -1,317 +1,120 @@
-import {
-sendTelegramMessage,
-type TelegramMessage,
-} from "../telegram-client";
+import { HelpdeskApiClient } from "../api-client";
+import { getChoiceKeyboard, getConfirmKeyboard, MAIN_ACTIONS } from "../keyboards/main.keyboard";
+import { sendTelegramMessage, type TelegramMessage } from "../telegram-client";
 
-import {
-HelpdeskApiClient,
-} from "../api-client";
+type BotEnv = { DB: D1Database; API_URL: string; BOT_TOKEN: string };
+type TicketSessionState = "employee" | "city" | "department" | "system" | "type" | "problem" | "confirmation";
+type TicketSessionData = { employee?: string; city?: string; department?: string; system?: string; type?: string; problem?: string };
+type TicketSession = { state: TicketSessionState; data: TicketSessionData };
 
-type BotEnv = {
-    DB: D1Database;
-    API_URL: string;
-    BOT_TOKEN: string;
-};
+const cities = ["Новосибирск", "Красноярск", "Томск", "Кемерово", "Братск", "Другой город"];
+const departments = ["Офис", "Склад", "Логистика", "Бухгалтерия", "Закупки", "Другое"];
+const types = ["Не работает", "Ошибка", "Доступ", "Настройка", "Оборудование", "Другое"];
 
-type TicketSessionState =
-| "employee"
-| "city"
-| "department"
-| "system"
-| "type"
-| "problem"
-| "expectedResult"
-| "scale"
-| "confirmation";
-
-type TicketSessionData = {
-    employee?: string;
-    city?: string;
-    department?: string;
-    system?: string;
-    type?: string;
-    problem?: string;
-    expectedResult?: string;
-    scale?: string;
-};
-
-type TicketSession = {
-    state: TicketSessionState;
-    data: TicketSessionData;
-};
-
-async function getSession(
-env: BotEnv,
-chatId: number,
-) {
-    const result = await env.DB.prepare(
-    `
-      SELECT state, payload
-      FROM bot_sessions
-      WHERE chat_id = ?
-    `,
-    )
-    .bind(String(chatId))
-    .first<{
-    state: TicketSessionState;
-    payload: string;
-    }>();
-
-    if (!result) {
+async function getSession(env: BotEnv, chatId: number): Promise<TicketSession | null> {
+    const row = await env.DB.prepare("SELECT state, payload FROM bot_sessions WHERE chat_id = ?")
+        .bind(String(chatId)).first<{ state: TicketSessionState; payload: string }>();
+    if (!row) return null;
+    const data = JSON.parse(row.payload) as TicketSessionData;
+    // Discard a session from the previous English form so it cannot ask irrelevant questions.
+    if ("expectedResult" in data || "scale" in data) {
+        await deleteSession(env, chatId);
         return null;
     }
-
-    return {
-        state: result.state,
-        data: JSON.parse(result.payload) as TicketSessionData,
-    } satisfies TicketSession;
+    return { state: row.state, data };
 }
 
-async function saveSession(
-env: BotEnv,
-chatId: number,
-session: TicketSession,
-) {
-    await env.DB.prepare(
-    `
-      INSERT INTO bot_sessions (
-        chat_id,
-        state,
-        payload,
-        updated_at
-      )
-      VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-      ON CONFLICT(chat_id)
-      DO UPDATE SET
-        state = excluded.state,
-        payload = excluded.payload,
-        updated_at = CURRENT_TIMESTAMP
-    `,
-    )
-    .bind(
-    String(chatId),
-    session.state,
-    JSON.stringify(session.data),
-    )
-    .run();
+async function saveSession(env: BotEnv, chatId: number, session: TicketSession) {
+    await env.DB.prepare(`INSERT INTO bot_sessions (chat_id, state, payload, updated_at)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(chat_id) DO UPDATE SET state=excluded.state, payload=excluded.payload, updated_at=CURRENT_TIMESTAMP`)
+        .bind(String(chatId), session.state, JSON.stringify(session.data)).run();
 }
 
-async function deleteSession(
-env: BotEnv,
-chatId: number,
-) {
-    await env.DB.prepare(
-    `
-      DELETE FROM bot_sessions
-      WHERE chat_id = ?
-    `,
-    )
-    .bind(String(chatId))
-    .run();
+async function deleteSession(env: BotEnv, chatId: number) {
+    await env.DB.prepare("DELETE FROM bot_sessions WHERE chat_id = ?").bind(String(chatId)).run();
 }
 
-async function askNextQuestion(
-env: BotEnv,
-chatId: number,
-state: TicketSessionState,
-) {
-    const questions: Record<
-        TicketSessionState,
-        string
-        > = {
-        employee: "Enter your name:",
-        city: "Enter your city:",
-        department: "Enter your department:",
-        system: "Enter the system or application:",
-        type: "Enter the request type:",
-        problem: "Describe the problem:",
-        expectedResult: "What result do you expect?",
-        scale: "Describe the scale or impact:",
-        confirmation:
-        "Create this ticket?\n\nReply with Yes or Cancel.",
+function promptFor(state: TicketSessionState) {
+    const prompts: Record<TicketSessionState, string> = {
+        employee: "Как вас зовут? Напишите имя и фамилию.",
+        city: "Выберите ваш город:",
+        department: "Выберите подразделение:",
+        system: "В какой программе или системе возникла проблема? Например: 1С, почта, принтер.",
+        type: "Выберите тип проблемы:",
+        problem: "Опишите, что случилось и что именно не работает.",
+        confirmation: "Проверьте заявку и подтвердите создание:",
     };
-
-    await sendTelegramMessage(
-    env.BOT_TOKEN,
-    chatId,
-    questions[state],
-    );
+    return prompts[state];
 }
 
-function formatPreview(
-data: TicketSessionData,
-) {
-    return [
-    "Please check the ticket:",
-    "",
-    `Employee: ${data.employee}`,
-    `City: ${data.city}`,
-    `Department: ${data.department}`,
-    `System: ${data.system}`,
-    `Type: ${data.type}`,
-    `Problem: ${data.problem}`,
-    `Expected result: ${data.expectedResult}`,
-    `Scale: ${data.scale}`,
-    "",
-    "Create this ticket?",
-    "Reply with Yes or Cancel.",
-    ].join("\n");
+function keyboardFor(state: TicketSessionState) {
+    if (state === "city") return getChoiceKeyboard(cities);
+    if (state === "department") return getChoiceKeyboard(departments);
+    if (state === "type") return getChoiceKeyboard(types);
+    if (state === "confirmation") return getConfirmKeyboard();
+    return undefined;
 }
 
-export async function handleCreateTicketFlow(
-env: BotEnv,
-message: TelegramMessage,
-) {
+function preview(data: TicketSessionData) {
+    return ["Проверьте заявку:", "", `Сотрудник: ${data.employee}`, `Город: ${data.city}`,
+        `Подразделение: ${data.department}`, `Система: ${data.system}`, `Тип: ${data.type}`,
+        `Проблема: ${data.problem}`, "", "Создать заявку?"] .join("\n");
+}
+
+export async function handleCreateTicketFlow(env: BotEnv, message: TelegramMessage) {
     const chatId = message.chat.id;
     const text = message.text?.trim();
-
-    if (!text) {
-        return false;
-    }
+    if (!text) return false;
 
     let session = await getSession(env, chatId);
+    if ([MAIN_ACTIONS.createTicket, "Создать заявку", "/ticket"].includes(text)) {
+        session = { state: "employee", data: {} };
+        await saveSession(env, chatId, session);
+        await sendTelegramMessage(env.BOT_TOKEN, chatId, promptFor(session.state));
+        return true;
+    }
+    if (!session) return false;
 
-    if (text === "Create Ticket") {
-        session = {
-            state: "employee",
-            data: {},
-        };
-
-        await saveSession(
-        env,
-        chatId,
-        session,
-        );
-
-        await askNextQuestion(
-        env,
-        chatId,
-        "employee",
-        );
-
+    const normalized = text.toLocaleLowerCase("ru");
+    if (["отмена", "✖ отмена", "/cancel"].includes(normalized)) {
+        await deleteSession(env, chatId);
+        await sendTelegramMessage(env.BOT_TOKEN, chatId, "Создание заявки отменено.");
         return true;
     }
 
-    if (!session) {
-        return false;
-    }
-
-    if (
-    session.state === "confirmation" &&
-    text.toLowerCase() === "cancel"
-    ) {
-        await deleteSession(env, chatId);
-
-        await sendTelegramMessage(
-        env.BOT_TOKEN,
-        chatId,
-        "Ticket creation cancelled.",
-        );
-
-        return true;
-    }
-
-    if (
-    session.state === "confirmation" &&
-    text.toLowerCase() === "yes"
-    ) {
-        const api = new HelpdeskApiClient({
-            apiUrl: env.API_URL,
-        });
-
-        const result = await api.createTicket({
-            employee: session.data.employee!,
-            city: session.data.city,
-            department: session.data.department,
-            system: session.data.system,
-            type: session.data.type,
-            problem: session.data.problem!,
-            expectedResult: session.data.expectedResult,
-            scale: session.data.scale,
-        }) as {
-            ok: boolean;
-            publicId?: string;
-            error?: string;
-        };
-
-        await deleteSession(env, chatId);
-
-        if (!result.ok) {
-            await sendTelegramMessage(
-            env.BOT_TOKEN,
-            chatId,
-            `Ticket creation failed: ${
-            result.error || "Unknown error"
-            }`,
-            );
-
+    if (session.state === "confirmation") {
+        if (!["✅ да, создать", "да", "создать"].includes(normalized)) {
+            await sendTelegramMessage(env.BOT_TOKEN, chatId, "Нажмите «✅ Да, создать» или «✖ Отмена».", getConfirmKeyboard());
             return true;
         }
-
-        await sendTelegramMessage(
-        env.BOT_TOKEN,
-        chatId,
-        `Ticket created successfully.\n\nTicket ID: ${result.publicId}`,
-        );
-
+        const result = await new HelpdeskApiClient({ apiUrl: env.API_URL }).createTicket({
+            employee: session.data.employee!, city: session.data.city, department: session.data.department,
+            system: session.data.system, type: session.data.type, problem: session.data.problem!,
+        }) as { ok: boolean; publicId?: string; error?: string };
+        await deleteSession(env, chatId);
+        await sendTelegramMessage(env.BOT_TOKEN, chatId,
+            result.ok ? `✅ Заявка создана!\nНомер: ${result.publicId}` : `Не удалось создать заявку: ${result.error || "ошибка сервера"}`);
         return true;
     }
 
-    const stateOrder: TicketSessionState[] = [
-    "employee",
-    "city",
-    "department",
-    "system",
-    "type",
-    "problem",
-    "expectedResult",
-    "scale",
-    "confirmation",
-    ];
-
-    const currentIndex =
-    stateOrder.indexOf(session.state);
-
-    if (currentIndex === -1) {
-        await deleteSession(env, chatId);
-        return false;
+    const order: TicketSessionState[] = ["employee", "city", "department", "system", "type", "problem", "confirmation"];
+    const currentIndex = order.indexOf(session.state);
+    if (currentIndex < 0) { await deleteSession(env, chatId); return false; }
+    if (session.state === "city" && !cities.includes(text)) {
+        await sendTelegramMessage(env.BOT_TOKEN, chatId, "Выберите город кнопкой ниже.", getChoiceKeyboard(cities)); return true;
     }
-
-    const currentState = session.state;
-
-    if (currentState !== "confirmation") {
-        session.data[currentState] = text;
+    if (session.state === "department" && !departments.includes(text)) {
+        await sendTelegramMessage(env.BOT_TOKEN, chatId, "Выберите подразделение кнопкой ниже.", getChoiceKeyboard(departments)); return true;
     }
-
-    const nextState =
-    stateOrder[currentIndex + 1];
-
-    if (!nextState) {
-        await deleteSession(env, chatId);
-        return false;
+    if (session.state === "type" && !types.includes(text)) {
+        await sendTelegramMessage(env.BOT_TOKEN, chatId, "Выберите тип проблемы кнопкой ниже.", getChoiceKeyboard(types)); return true;
     }
-
-    session.state = nextState;
-
-    await saveSession(
-    env,
-    chatId,
-    session,
-    );
-
-    if (nextState === "confirmation") {
-        await sendTelegramMessage(
-        env.BOT_TOKEN,
-        chatId,
-        formatPreview(session.data),
-        );
-    } else {
-        await askNextQuestion(
-        env,
-        chatId,
-        nextState,
-        );
-    }
-
+    if (session.state !== "confirmation") session.data[session.state] = text;
+    session.state = order[currentIndex + 1];
+    await saveSession(env, chatId, session);
+    await sendTelegramMessage(env.BOT_TOKEN, chatId,
+        session.state === "confirmation" ? preview(session.data) : promptFor(session.state),
+        keyboardFor(session.state));
     return true;
 }
