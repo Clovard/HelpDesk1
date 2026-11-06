@@ -74,7 +74,7 @@ export default function KanbanPage() {
                         >
                             <div className="kanban-card-top"><strong>{ticket.public_id}</strong><span className="level-badge">{ticket.support_level || "—"}</span></div>
                             <p>{ticket.problem}</p>
-                            <small>{ticket.assignee || "Не назначен"} · {ticket.employee}</small>
+                            <small>{ticket.assignee || "Не назначен"} · {ticket.employee_telegram_id || ticket.employee}</small>
                             <span className="drag-hint">Перетащите, чтобы изменить статус</span>
                         </article>
                     ))}

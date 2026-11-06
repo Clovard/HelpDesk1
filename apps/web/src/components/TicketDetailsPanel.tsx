@@ -158,6 +158,7 @@ export default function TicketDetailsPanel({ ticket, onClose, onSaved, onDeleted
                         {field("Дата", draft.date, "date")}
                         {field("Время", draft.time, "time")}
                         {field("Сотрудник", draft.employee, "employee")}
+                        {!editing && <label className="details-field"><span>Telegram</span><strong>{ticket.employee_telegram_id || "—"}</strong></label>}
                         {field("Город", draft.city, "city")}
                         {field("Подразделение", draft.department, "department")}
                         {field("Система", draft.system, "system")}

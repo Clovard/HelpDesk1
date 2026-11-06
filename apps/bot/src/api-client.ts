@@ -28,6 +28,7 @@ export class HelpdeskApiClient {
         system?: string;
         type?: string;
         problem: string;
+        employeeTelegramId?: string;
         expectedResult?: string;
         scale?: string;
     }) {

@@ -3,8 +3,8 @@ import { getChoiceKeyboard, getConfirmKeyboard, MAIN_ACTIONS } from "../keyboard
 import { sendTelegramMessage, type TelegramMessage } from "../telegram-client";
 
 type BotEnv = { DB: D1Database; API_URL: string; BOT_TOKEN: string };
-type TicketSessionState = "employee" | "city" | "department" | "system" | "type" | "problem" | "confirmation";
-type TicketSessionData = { employee?: string; city?: string; department?: string; system?: string; type?: string; problem?: string };
+type TicketSessionState = "city" | "department" | "system" | "type" | "problem" | "confirmation";
+type TicketSessionData = { employee?: string; telegramId?: string; city?: string; department?: string; system?: string; type?: string; problem?: string };
 type TicketSession = { state: TicketSessionState; data: TicketSessionData };
 
 const cities = ["Новосибирск", "Красноярск", "Томск", "Кемерово", "Братск", "Другой город"];
@@ -37,7 +37,6 @@ async function deleteSession(env: BotEnv, chatId: number) {
 
 function promptFor(state: TicketSessionState) {
     const prompts: Record<TicketSessionState, string> = {
-        employee: "Как вас зовут? Напишите имя и фамилию.",
         city: "Выберите ваш город:",
         department: "Выберите подразделение:",
         system: "В какой программе или системе возникла проблема? Например: 1С, почта, принтер.",
@@ -57,7 +56,7 @@ function keyboardFor(state: TicketSessionState) {
 }
 
 function preview(data: TicketSessionData) {
-    return ["Проверьте заявку:", "", `Сотрудник: ${data.employee}`, `Город: ${data.city}`,
+    return ["Проверьте заявку:", "", `Telegram: ${data.telegramId || "не указан"}`, `Имя сотрудника: заполнит IT-служба`, `Город: ${data.city}`,
         `Подразделение: ${data.department}`, `Система: ${data.system}`, `Тип: ${data.type}`,
         `Проблема: ${data.problem}`, "", "Создать заявку?"] .join("\n");
 }
@@ -69,9 +68,11 @@ export async function handleCreateTicketFlow(env: BotEnv, message: TelegramMessa
 
     let session = await getSession(env, chatId);
     if ([MAIN_ACTIONS.createTicket, "Создать заявку", "🛠 создать заявку", "Create Ticket", "/ticket"].includes(text)) {
-        session = { state: "employee", data: {} };
+        session = { state: "city", data: { employee: "Не указано" } };
+        const from = message.from;
+        session.data.telegramId = from?.username ? `@${from.username} (ID: ${from.id})` : String(from?.id ?? chatId);
         await saveSession(env, chatId, session);
-        await sendTelegramMessage(env.BOT_TOKEN, chatId, promptFor(session.state));
+        await sendTelegramMessage(env.BOT_TOKEN, chatId, promptFor(session.state), keyboardFor(session.state));
         return true;
     }
     if (!session) return false;
@@ -91,6 +92,7 @@ export async function handleCreateTicketFlow(env: BotEnv, message: TelegramMessa
         const result = await new HelpdeskApiClient({ apiUrl: env.API_URL }).createTicket({
             employee: session.data.employee!, city: session.data.city, department: session.data.department,
             system: session.data.system, type: session.data.type, problem: session.data.problem!,
+            employeeTelegramId: session.data.telegramId,
         }) as { ok: boolean; publicId?: string; ticket?: { public_id?: string }; error?: string };
         await deleteSession(env, chatId);
         await sendTelegramMessage(env.BOT_TOKEN, chatId,
@@ -98,7 +100,7 @@ export async function handleCreateTicketFlow(env: BotEnv, message: TelegramMessa
         return true;
     }
 
-    const order: TicketSessionState[] = ["employee", "city", "department", "system", "type", "problem", "confirmation"];
+    const order: TicketSessionState[] = ["city", "department", "system", "type", "problem", "confirmation"];
     const currentIndex = order.indexOf(session.state);
     if (currentIndex < 0) { await deleteSession(env, chatId); return false; }
     if (session.state === "city" && !cities.includes(text)) {

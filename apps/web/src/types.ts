@@ -12,6 +12,7 @@ export type Ticket = {
     date: string;
     time: string;
     employee: string;
+    employee_telegram_id: string | null;
     city: string | null;
     department: string | null;
     system: string | null;
