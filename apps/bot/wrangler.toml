@@ -8,4 +8,4 @@ database_name = "helpdesk-db"
 database_id = "f25dcb55-4ad5-4465-9f47-e53f12a8e6a9"
 
 [vars]
-API_URL = "https://it-help-panel.andrejsarafonov.workers.dev"
+API_URL = "https://helpdesk-api.andrejsarafonov.workers.dev"
