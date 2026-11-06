@@ -9,6 +9,18 @@ export class HelpdeskApiClient {
         this.apiUrl = options.apiUrl.replace(/\/$/, "");
     }
 
+    private async readJson(response: Response) {
+        const body = await response.text();
+        try {
+            return JSON.parse(body) as Record<string, unknown>;
+        } catch {
+            return {
+                ok: false,
+                error: `API вернул не JSON (HTTP ${response.status}): ${body.slice(0, 180) || "пустой ответ"}`,
+            };
+        }
+    }
+
     async createTicket(data: {
         employee: string;
         city?: string;
@@ -30,7 +42,7 @@ export class HelpdeskApiClient {
         },
         );
 
-        return response.json();
+        return this.readJson(response);
     }
 
     async createIdea(data: {
@@ -53,7 +65,7 @@ export class HelpdeskApiClient {
         },
         );
 
-        return response.json();
+        return this.readJson(response);
     }
 
     async getTicketsByEmployee(

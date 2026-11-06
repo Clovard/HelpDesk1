@@ -91,10 +91,10 @@ export async function handleCreateTicketFlow(env: BotEnv, message: TelegramMessa
         const result = await new HelpdeskApiClient({ apiUrl: env.API_URL }).createTicket({
             employee: session.data.employee!, city: session.data.city, department: session.data.department,
             system: session.data.system, type: session.data.type, problem: session.data.problem!,
-        }) as { ok: boolean; publicId?: string; error?: string };
+        }) as { ok: boolean; publicId?: string; ticket?: { public_id?: string }; error?: string };
         await deleteSession(env, chatId);
         await sendTelegramMessage(env.BOT_TOKEN, chatId,
-            result.ok ? `✅ Заявка создана!\nНомер: ${result.publicId}` : `Не удалось создать заявку: ${result.error || "ошибка сервера"}`);
+            result.ok ? `✅ Заявка создана!\nНомер: ${result.publicId || result.ticket?.public_id || "создана"}` : `Не удалось создать заявку: ${result.error || "ошибка сервера"}`);
         return true;
     }
 
