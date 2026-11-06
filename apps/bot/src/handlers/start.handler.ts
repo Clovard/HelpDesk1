@@ -11,7 +11,7 @@ export async function handleStart(
     return sendTelegramMessage(
         token,
         chatId,
-        `Привет, ${name}! 👋\n\nДобро пожаловать в IT Helpdesk. Выбери действие:`,
+        `Привет, ${name}! 👋\n\nДобро пожаловать в IT-поддержку. Выберите действие:`,
         getMainKeyboard(),
     );
 }

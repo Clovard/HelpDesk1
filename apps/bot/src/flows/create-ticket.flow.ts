@@ -68,7 +68,7 @@ export async function handleCreateTicketFlow(env: BotEnv, message: TelegramMessa
     if (!text) return false;
 
     let session = await getSession(env, chatId);
-    if ([MAIN_ACTIONS.createTicket, "Создать заявку", "/ticket"].includes(text)) {
+    if ([MAIN_ACTIONS.createTicket, "Создать заявку", "🛠 создать заявку", "Create Ticket", "/ticket"].includes(text)) {
         session = { state: "employee", data: {} };
         await saveSession(env, chatId, session);
         await sendTelegramMessage(env.BOT_TOKEN, chatId, promptFor(session.state));

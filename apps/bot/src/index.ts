@@ -18,6 +18,7 @@ import {
 sendTelegramMessage,
 type TelegramUpdate,
 } from "./telegram-client";
+import { getMainKeyboard, MAIN_ACTIONS } from "./keyboards/main.keyboard";
 
 type Env = {
     DB: D1Database;
@@ -47,14 +48,17 @@ export default {
 
         const chatId = message.chat.id;
         const text = message.text.trim();
+        const normalized = text.toLocaleLowerCase("ru").replace(/[✅✖❌🛠💡📋]/gu, "").trim();
 
+        // Reset stale ticket/idea sessions before any flow can consume the message as form data.
         if (text === "/start") {
-            await handleStart(
-            env.BOT_TOKEN,
-            chatId,
-            message.from?.first_name,
-            );
-
+            await env.DB.prepare("DELETE FROM bot_sessions WHERE chat_id = ?").bind(String(chatId)).run();
+            await handleStart(env.BOT_TOKEN, chatId, message.from?.first_name);
+            return new Response("OK");
+        }
+        if (["отмена", "cancel", "/cancel"].includes(normalized)) {
+            await env.DB.prepare("DELETE FROM bot_sessions WHERE chat_id = ?").bind(String(chatId)).run();
+            await sendTelegramMessage(env.BOT_TOKEN, chatId, "Действие отменено. Выберите, что сделать дальше:", getMainKeyboard());
             return new Response("OK");
         }
 
@@ -78,12 +82,12 @@ export default {
             return new Response("OK");
         }
 
-        if (text === "My Tickets") {
+        if ([MAIN_ACTIONS.myTickets, "Мои заявки", "My Tickets"].includes(text)) {
             await handleMyTickets(
             env,
             chatId,
             message.from?.first_name ||
-            "Unknown Employee",
+            "Сотрудник",
             );
 
             return new Response("OK");
@@ -92,7 +96,8 @@ export default {
         await sendTelegramMessage(
         env.BOT_TOKEN,
         chatId,
-        "Please choose an action from the menu.",
+        "Выберите действие с помощью кнопок меню.",
+        getMainKeyboard(),
         );
 
         return new Response("OK");
