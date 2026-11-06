@@ -81,9 +81,11 @@ input: CreateTicketInput,
         problem,
         expected_result,
         status,
+        support_level,
+        assignee,
         scale
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     )
     .bind(
@@ -98,6 +100,8 @@ input: CreateTicketInput,
     input.problem,
     input.expectedResult ?? null,
     "New",
+    "L1",
+    "Андрей",
     input.scale ?? null,
     )
     .run();
