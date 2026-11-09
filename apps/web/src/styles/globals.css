@@ -411,6 +411,25 @@
   border-color: #c5c5c5;
   background: #fbfbfb;
 }
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+.export-summary {
+  margin: 16px 0 0;
+  padding: 12px 13px;
+  display: flex;
+  justify-content: space-between;
+  border: 1px solid #e7e7e7;
+  border-radius: 8px;
+  color: #858585;
+  background: #fafafa;
+  font-size: 9px;
+}
+.export-summary strong {
+  color: #353535;
+}
 .button.danger {
   margin-left: auto;
   color: #c84f5b;

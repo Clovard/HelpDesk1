@@ -3,6 +3,7 @@ import { getApiUrl, helpdeskApi, saveApiUrl, toApiStatus, toUiIdea, toUiTicket }
 
 type View = "tickets" | "ideas" | "settings";
 type TicketView = "list" | "kanban";
+type ExportKind = "tickets" | "ideas";
 type TicketStatus = "Новая" | "На рассмотрении" | "В работе" | "Закрыта";
 type TicketFilters = {
   city: string;
@@ -338,6 +339,28 @@ function StatusBadge({ status }: { status: TicketStatus }) {
   );
 }
 
+function displayDateToIso(date: string) {
+  const match = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(date);
+  return match ? `${match[3]}-${match[2]}-${match[1]}` : "";
+}
+
+function downloadCsv(filename: string, headers: string[], rows: string[][]) {
+  const escapeCell = (value: string) => {
+    const safeValue = /^[\s]*[=+@\-\t\r]/.test(value) ? `'${value}` : value;
+    return `"${safeValue.replace(/"/g, '""')}"`;
+  };
+  const content = [headers, ...rows].map((row) => row.map(escapeCell).join(";")).join("\r\n");
+  const blob = new Blob([`\uFEFF${content}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function App() {
   const [view, setView] = useState<View>("tickets");
   const [ticketView, setTicketView] = useState<TicketView>("list");
@@ -356,7 +379,7 @@ function App() {
   });
   const [ideasSearch, setIdeasSearch] = useState("");
   const [selected, setSelected] = useState<Ticket | null>(null);
-  const [panel, setPanel] = useState<"details" | "create" | "createIdea" | null>(null);
+  const [panel, setPanel] = useState<"details" | "create" | "createIdea" | "exportTickets" | "exportIdeas" | null>(null);
   const [editing, setEditing] = useState(false);
   const [draggedId, setDraggedId] = useState<number | null>(null);
   const [toast, setToast] = useState("");
@@ -510,6 +533,92 @@ function App() {
     }
   }
 
+  function exportPeriod(kind: ExportKind, from: string, to: string) {
+    if (kind === "tickets") {
+      const selectedTickets = tickets.filter((ticket) => {
+        const date = displayDateToIso(ticket.date);
+        return date >= from && date <= to;
+      });
+      downloadCsv(
+        `Заявки_${from}_${to}.csv`,
+        [
+          "ID",
+          "Дата и время",
+          "Сотрудник / Telegram",
+          "Город",
+          "Подразделение",
+          "Система",
+          "Тип",
+          "Проблема / ситуация",
+          "Ожидаемый результат",
+          "Статус IT",
+          "Комментарий IT",
+          "Уровень",
+          "Ответственный",
+          "Масштаб",
+        ],
+        selectedTickets.map((ticket) => [
+          ticket.publicId,
+          `${ticket.date} ${ticket.time}`.trim(),
+          `${ticket.employee}${ticket.telegram && ticket.telegram !== "—" ? ` (${ticket.telegram})` : ""}`,
+          ticket.city,
+          ticket.department,
+          ticket.system,
+          ticket.type,
+          ticket.problem,
+          ticket.expected,
+          ticket.status,
+          ticket.comment || "—",
+          ticket.level,
+          ticket.assignee,
+          ticket.scale,
+        ]),
+      );
+      notify(`Выгрузка заявок завершена: ${selectedTickets.length}`);
+    } else {
+      const selectedIdeas = ideas.filter((idea) => {
+        const date = displayDateToIso(idea.date);
+        return date >= from && date <= to;
+      });
+      downloadCsv(
+        `Идеи_${from}_${to}.csv`,
+        [
+          "ID",
+          "Дата и время",
+          "Сотрудник",
+          "Город",
+          "Подразделение",
+          "Система",
+          "Идея / тип предложения",
+          "Ожидаемый результат",
+          "Приоритет",
+          "Статус IT",
+          "Ответственный",
+          "Комментарий",
+        ],
+        selectedIdeas.map((idea) => [
+          idea.id,
+          `${idea.date} ${idea.time}`.trim(),
+          idea.employee,
+          idea.city,
+          idea.department,
+          idea.system,
+          idea.idea,
+          idea.expected,
+          idea.priority,
+          idea.status,
+          idea.assignee,
+          idea.comment || "—",
+        ]),
+      );
+      notify(`Выгрузка идей завершена: ${selectedIdeas.length}`);
+    }
+    setPanel(null);
+  }
+
+  const activeExportKind: ExportKind | null =
+    panel === "exportTickets" ? "tickets" : panel === "exportIdeas" ? "ideas" : null;
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -622,10 +731,17 @@ function App() {
             apiOnline={apiOnline}
             onDragStart={setDraggedId}
             onDrop={moveTicket}
+            onExport={() => setPanel("exportTickets")}
           />
         )}
         {view === "ideas" && (
-          <IdeasPage ideas={ideas} search={ideasSearch} setSearch={setIdeasSearch} onCreate={() => setPanel("createIdea")} />
+          <IdeasPage
+            ideas={ideas}
+            search={ideasSearch}
+            setSearch={setIdeasSearch}
+            onCreate={() => setPanel("createIdea")}
+            onExport={() => setPanel("exportIdeas")}
+          />
         )}
         {view === "settings" && (
           <SettingsPage notify={notify} apiUrl={getApiUrl()} apiOnline={apiOnline} onSaveApiUrl={saveApiUrl} onRefresh={() => void refreshData(true)} />
@@ -651,6 +767,14 @@ function App() {
           onSave={updateTicket}
           onDelete={deleteTicket}
           notify={notify}
+        />
+      )}
+      {activeExportKind && (
+        <ExportPeriodPanel
+          kind={activeExportKind}
+          records={activeExportKind === "tickets" ? tickets : ideas}
+          onClose={() => setPanel(null)}
+          onExport={(from, to) => exportPeriod(activeExportKind, from, to)}
         />
       )}
       {toast && (
@@ -679,6 +803,7 @@ function TicketsPage({
   apiOnline,
   onDragStart,
   onDrop,
+  onExport,
 }: {
   tickets: Ticket[];
   visibleTickets: Ticket[];
@@ -693,6 +818,7 @@ function TicketsPage({
   apiOnline: boolean;
   onDragStart: (id: number) => void;
   onDrop: (status: TicketStatus) => void;
+  onExport: () => void;
 }) {
   const [page, setPage] = useState(1);
   const pageSize = 10;
@@ -724,6 +850,10 @@ function TicketsPage({
           <button className="button secondary compact" onClick={onRefresh}>
             <Icon name="refresh" size={17} />
             {loading ? "Загружаем…" : "Обновить"}
+          </button>
+          <button className="button secondary" onClick={onExport}>
+            <Icon name="download" size={16} />
+            Выгрузить
           </button>
           <button className="button primary" onClick={onCreate}>
             <Icon name="plus" size={18} />
@@ -1084,11 +1214,13 @@ function IdeasPage({
   search,
   setSearch,
   onCreate,
+  onExport,
 }: {
   ideas: Idea[];
   search: string;
   setSearch: (value: string) => void;
   onCreate: () => void;
+  onExport: () => void;
 }) {
   const [city, setCity] = useState("");
   const [priority, setPriority] = useState("");
@@ -1109,6 +1241,12 @@ function IdeasPage({
           </div>
           <h1>Идеи</h1>
           <p>Предложения сотрудников по улучшению систем и процессов</p>
+        </div>
+        <div className="heading-actions">
+          <button className="button secondary" onClick={onExport}>
+            <Icon name="download" size={16} />
+            Выгрузить
+          </button>
         </div>
       </div>
       <section className="content-card ideas-card">
@@ -1380,6 +1518,87 @@ function SettingsPage({
           </footer>
         </section>
       </div>
+    </div>
+  );
+}
+
+function ExportPeriodPanel({
+  kind,
+  records,
+  onClose,
+  onExport,
+}: {
+  kind: ExportKind;
+  records: Array<{ date: string }>;
+  onClose: () => void;
+  onExport: (from: string, to: string) => void;
+}) {
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const validRange = Boolean(from && to && from <= to);
+  const count = validRange
+    ? records.filter((record) => {
+        const date = displayDateToIso(record.date);
+        return date >= from && date <= to;
+      }).length
+    : 0;
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (validRange) onExport(from, to);
+  }
+
+  return (
+    <div className="panel-backdrop" onMouseDown={onClose}>
+      <aside className="side-panel" onMouseDown={(event) => event.stopPropagation()}>
+        <header className="panel-header">
+          <div>
+            <span className="eyebrow">Экспорт данных</span>
+            <h2>Выгрузка {kind === "tickets" ? "заявок" : "идей"}</h2>
+            <p>Таблица откроется в Excel</p>
+          </div>
+          <button className="panel-close" onClick={onClose} aria-label="Закрыть">
+            <Icon name="close" size={20} />
+          </button>
+        </header>
+        <form onSubmit={submit}>
+          <div className="panel-content">
+            <section className="form-section">
+              <div className="section-heading">
+                <span>01</span>
+                <div>
+                  <h3>Период выгрузки</h3>
+                  <p>Обе даты включаются в отчёт</p>
+                </div>
+              </div>
+              <div className="form-grid">
+                <label className="form-field">
+                  <span>С даты</span>
+                  <input type="date" required value={from} max={to || undefined} onChange={(event) => setFrom(event.target.value)} />
+                </label>
+                <label className="form-field">
+                  <span>По дату</span>
+                  <input type="date" required value={to} min={from || undefined} onChange={(event) => setTo(event.target.value)} />
+                </label>
+              </div>
+              <p className="export-summary">
+                Записей для выгрузки: <strong>{validRange ? count : "—"}</strong>
+              </p>
+              <div className="security-note">
+                <p>Будут выгружены все записи за выбранный период с колонками, как в таблице сайта. Формат CSV совместим с Excel.</p>
+              </div>
+            </section>
+          </div>
+          <footer className="panel-footer">
+            <span>Формат файла: CSV · Excel</span>
+            <div>
+              <button type="button" className="button secondary" onClick={onClose}>Отмена</button>
+              <button className="button primary" type="submit" disabled={!validRange}>
+                <Icon name="download" size={15} /> Скачать таблицу
+              </button>
+            </div>
+          </footer>
+        </form>
+      </aside>
     </div>
   );
 }
