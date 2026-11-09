@@ -56,7 +56,7 @@ function keyboardFor(state: TicketSessionState) {
 }
 
 function preview(data: TicketSessionData) {
-    return ["Проверьте заявку:", "", `Telegram: ${data.telegramId || "не указан"}`, `Имя сотрудника: заполнит IT-служба`, `Город: ${data.city}`,
+    return ["Проверьте заявку:", "", `Сотрудник: ${data.employee || "Пользователь Telegram"}`, `Telegram: ${data.telegramId || "не указан"}`, `Город: ${data.city}`,
         `Подразделение: ${data.department}`, `Система: ${data.system}`, `Тип: ${data.type}`,
         `Проблема: ${data.problem}`, "", "Создать заявку?"] .join("\n");
 }
@@ -68,9 +68,16 @@ export async function handleCreateTicketFlow(env: BotEnv, message: TelegramMessa
 
     let session = await getSession(env, chatId);
     if ([MAIN_ACTIONS.createTicket, "Создать заявку", "🛠 создать заявку", "Create Ticket", "/ticket"].includes(text)) {
-        session = { state: "city", data: { employee: "Не указано" } };
         const from = message.from;
-        session.data.telegramId = from?.username ? `@${from.username} (ID: ${from.id})` : String(from?.id ?? chatId);
+        const employee = [from?.first_name, from?.last_name].filter(Boolean).join(" ").trim()
+            || (from?.username ? `@${from.username}` : "Пользователь Telegram");
+        session = {
+            state: "city",
+            data: {
+                employee,
+                telegramId: from?.username ? `@${from.username} (ID: ${from.id})` : `ID: ${from?.id ?? chatId}`,
+            },
+        };
         await saveSession(env, chatId, session);
         await sendTelegramMessage(env.BOT_TOKEN, chatId, promptFor(session.state), keyboardFor(session.state));
         return true;
