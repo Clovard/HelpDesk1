@@ -345,6 +345,7 @@ function App() {
   const [apiOnline, setApiOnline] = useState(false);
   const [loading, setLoading] = useState(true);
   const refreshing = useRef(false);
+  const [today, setToday] = useState(() => new Date());
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<TicketFilters>({
     city: "",
@@ -383,7 +384,11 @@ function App() {
     const interval = window.setInterval(() => {
       void refreshData(false, false);
     }, 10_000);
-    return () => window.clearInterval(interval);
+    const dateInterval = window.setInterval(() => setToday(new Date()), 60_000);
+    return () => {
+      window.clearInterval(interval);
+      window.clearInterval(dateInterval);
+    };
   }, []);
 
   const visibleTickets = useMemo(() => {
@@ -582,11 +587,9 @@ function App() {
             <kbd>⌘ K</kbd>
           </div>
           <div className="topbar-right">
-            <a className="download-project" href="/ugli-it-helpdesk.zip" download>
-              <Icon name="download" size={15} />
-              Скачать проект
-            </a>
-            <span className="today">Сегодня, 6 ноября</span>
+            <span className="today">
+              Сегодня, {new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" }).format(today)}
+            </span>
             <button className="icon-round" aria-label="Уведомления">
               <span className="bell-dot" />
               <svg
