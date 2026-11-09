@@ -1542,6 +1542,29 @@ function ExportPeriodPanel({
         return date >= from && date <= to;
       }).length
     : 0;
+
+  function toDateInputValue(date: Date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  function applyPreset(preset: "thisMonth" | "lastMonth" | "year") {
+    const today = new Date();
+    const start =
+      preset === "year"
+        ? new Date(today.getFullYear(), 0, 1)
+        : preset === "thisMonth"
+          ? new Date(today.getFullYear(), today.getMonth(), 1)
+          : new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const end =
+      preset === "lastMonth"
+        ? new Date(today.getFullYear(), today.getMonth(), 0)
+        : today;
+    setFrom(toDateInputValue(start));
+    setTo(toDateInputValue(end));
+  }
   function submit(event: FormEvent) {
     event.preventDefault();
     if (validRange) onExport(from, to);
@@ -1569,6 +1592,17 @@ function ExportPeriodPanel({
                   <h3>Период выгрузки</h3>
                   <p>Обе даты включаются в отчёт</p>
                 </div>
+              </div>
+              <div className="export-presets" aria-label="Быстрый выбор периода">
+                <button type="button" className="export-preset" onClick={() => applyPreset("thisMonth")}>
+                  Этот месяц
+                </button>
+                <button type="button" className="export-preset" onClick={() => applyPreset("lastMonth")}>
+                  Прошлый месяц
+                </button>
+                <button type="button" className="export-preset" onClick={() => applyPreset("year")}>
+                  С начала года
+                </button>
               </div>
               <div className="form-grid">
                 <label className="form-field">
