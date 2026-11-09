@@ -48,6 +48,7 @@ type Idea = {
 };
 
 const statuses: TicketStatus[] = ["Новая", "На рассмотрении", "В работе", "Закрыта"];
+const supportLevels = ["L1", "L2", "L3"];
 const statusMeta: Record<TicketStatus, { tone: string; dot: string }> = {
   Новая: { tone: "status-new", dot: "#7057D9" },
   "На рассмотрении": { tone: "status-review", dot: "#B7791F" },
@@ -703,7 +704,6 @@ function TicketsPage({
 
   const cities = [...new Set(tickets.map((ticket) => ticket.city))].sort();
   const assignees = [...new Set(tickets.map((ticket) => ticket.assignee))].sort();
-  const levels = [...new Set(tickets.map((ticket) => ticket.level))].sort();
   const activeFilters = Object.values(filters).filter(Boolean).length;
 
   function setFilter(key: keyof TicketFilters, value: string) {
@@ -810,7 +810,7 @@ function TicketsPage({
           <FilterSelect
             label="Уровень"
             value={filters.level}
-            options={levels}
+            options={supportLevels}
             onChange={(value) => setFilter("level", value)}
           />
           <FilterSelect
