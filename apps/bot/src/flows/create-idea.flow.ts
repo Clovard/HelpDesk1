@@ -6,6 +6,7 @@ type TelegramMessage,
 import {
 HelpdeskApiClient,
 } from "../api-client";
+import { getChoiceKeyboard, getConfirmKeyboard } from "../keyboards/main.keyboard";
 
 type BotEnv = {
     DB: D1Database;
@@ -14,7 +15,6 @@ type BotEnv = {
 };
 
 type IdeaSessionState =
-| "employee"
 | "city"
 | "department"
 | "system"
@@ -117,23 +117,27 @@ state: IdeaSessionState,
         IdeaSessionState,
         string
         > = {
-        employee: "Enter your name:",
-        city: "Enter your city:",
-        department: "Enter your department:",
-        system: "Enter the system or process:",
-        idea: "Describe your idea:",
-        expectedResult:
-        "What result do you expect?",
-        priority:
-        "Choose priority: Low, Medium or High.",
-        confirmation:
-        "Create this idea?\n\nReply with Yes or Cancel.",
+        city: "Выберите ваш город:",
+        department: "Выберите подразделение:",
+        system: "Укажите систему или процесс:",
+        idea: "Опишите вашу идею:",
+        expectedResult: "Какого результата вы ожидаете?",
+        priority: "Выберите приоритет идеи:",
+        confirmation: "Проверьте идею и подтвердите создание:",
     };
 
+    const keyboard = state === "city"
+        ? getChoiceKeyboard(["Новосибирск", "Красноярск", "Томск", "Кемерово", "Братск", "Другой город"])
+        : state === "department"
+          ? getChoiceKeyboard(["Офис", "Склад", "Логистика", "Бухгалтерия", "Закупки", "Другое"])
+          : state === "priority"
+            ? getChoiceKeyboard(["Низкий", "Средний", "Высокий"])
+            : state === "confirmation" ? getConfirmKeyboard() : undefined;
     await sendTelegramMessage(
     env.BOT_TOKEN,
     chatId,
     questions[state],
+    keyboard,
     );
 }
 
@@ -141,18 +145,17 @@ function formatPreview(
 data: IdeaSessionData,
 ) {
     return [
-    "Please check the idea:",
+    "Проверьте идею:",
     "",
-    `Employee: ${data.employee}`,
-    `City: ${data.city}`,
-    `Department: ${data.department}`,
-    `System: ${data.system}`,
-    `Idea: ${data.idea}`,
-    `Expected result: ${data.expectedResult}`,
-    `Priority: ${data.priority}`,
+    `Сотрудник: ${data.employee}`,
+    `Город: ${data.city}`,
+    `Подразделение: ${data.department}`,
+    `Система: ${data.system}`,
+    `Идея: ${data.idea}`,
+    `Ожидаемый результат: ${data.expectedResult}`,
+    `Приоритет: ${{ Low: "Низкий", Medium: "Средний", High: "Высокий" }[data.priority || "Medium"]}`,
     "",
-    "Create this idea?",
-    "Reply with Yes or Cancel.",
+    "Создать идею?",
     ].join("\n");
 }
 
@@ -161,11 +164,11 @@ value: string,
 ) {
     const normalized = value.toLowerCase();
 
-    if (normalized === "low") {
+    if (normalized === "low" || normalized === "низкий") {
         return "Low" as const;
     }
 
-    if (normalized === "high") {
+    if (normalized === "high" || normalized === "высокий") {
         return "High" as const;
     }
 
@@ -185,10 +188,13 @@ message: TelegramMessage,
 
     let session = await getSession(env, chatId);
 
-    if (text === "Create Idea") {
+    if (text === "💡 Предложить идею" || text === "Предложить идею" || text === "Create Idea") {
+        const from = message.from;
+        const employee = [from?.first_name, from?.last_name].filter(Boolean).join(" ").trim()
+            || (from?.username ? `@${from.username}` : "Пользователь Telegram");
         session = {
-            state: "employee",
-            data: {},
+            state: "city",
+            data: { employee },
         };
 
         await saveSession(
@@ -200,7 +206,7 @@ message: TelegramMessage,
         await askNextQuestion(
         env,
         chatId,
-        "employee",
+        "city",
         );
 
         return true;
@@ -212,14 +218,14 @@ message: TelegramMessage,
 
     if (
     session.state === "confirmation" &&
-    text.toLowerCase() === "cancel"
+    ["cancel", "отмена", "✖ отмена"].includes(text.toLowerCase())
     ) {
         await deleteSession(env, chatId);
 
         await sendTelegramMessage(
         env.BOT_TOKEN,
         chatId,
-        "Idea creation cancelled.",
+        "Создание идеи отменено.",
         );
 
         return true;
@@ -227,7 +233,7 @@ message: TelegramMessage,
 
     if (
     session.state === "confirmation" &&
-    text.toLowerCase() === "yes"
+    ["yes", "да", "создать", "✅ да, создать"].includes(text.toLowerCase())
     ) {
         const api = new HelpdeskApiClient({
             apiUrl: env.API_URL,
@@ -254,9 +260,7 @@ message: TelegramMessage,
             await sendTelegramMessage(
             env.BOT_TOKEN,
             chatId,
-            `Idea creation failed: ${
-            result.error || "Unknown error"
-            }`,
+            `Не удалось создать идею: ${result.error || "ошибка сервера"}`,
             );
 
             return true;
@@ -265,14 +269,13 @@ message: TelegramMessage,
         await sendTelegramMessage(
         env.BOT_TOKEN,
         chatId,
-        `Idea created successfully.\n\nIdea ID: ${result.publicId}`,
+        `Идея создана!\nНомер: ${result.publicId}`,
         );
 
         return true;
     }
 
     const stateOrder: IdeaSessionState[] = [
-    "employee",
     "city",
     "department",
     "system",
