@@ -543,7 +543,8 @@ function App() {
         `Заявки_${from}_${to}.csv`,
         [
           "ID",
-          "Дата и время",
+          "Дата",
+          "Время",
           "Сотрудник / Telegram",
           "Город",
           "Подразделение",
@@ -559,7 +560,8 @@ function App() {
         ],
         selectedTickets.map((ticket) => [
           ticket.publicId,
-          `${ticket.date} ${ticket.time}`.trim(),
+          ticket.date,
+          ticket.time,
           `${ticket.employee}${ticket.telegram && ticket.telegram !== "—" ? ` (${ticket.telegram})` : ""}`,
           ticket.city,
           ticket.department,
@@ -584,7 +586,8 @@ function App() {
         `Идеи_${from}_${to}.csv`,
         [
           "ID",
-          "Дата и время",
+          "Дата",
+          "Время",
           "Сотрудник",
           "Город",
           "Подразделение",
@@ -598,7 +601,8 @@ function App() {
         ],
         selectedIdeas.map((idea) => [
           idea.id,
-          `${idea.date} ${idea.time}`.trim(),
+          idea.date,
+          idea.time,
           idea.employee,
           idea.city,
           idea.department,
