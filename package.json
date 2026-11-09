@@ -10,5 +10,9 @@
     "build": "npm run build --workspace @helpdesk/web",
     "build:web": "npm run build --workspace @helpdesk/web",
     "deploy:web": "npm run build:web && wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.45.0"
   }
 }
+
