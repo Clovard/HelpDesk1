@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { getApiUrl, helpdeskApi, saveApiUrl, toApiStatus, toUiIdea, toUiTicket } from "./api";
 
 type View = "tickets" | "ideas" | "settings";
@@ -344,6 +344,7 @@ function App() {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [apiOnline, setApiOnline] = useState(false);
   const [loading, setLoading] = useState(true);
+  const refreshing = useRef(false);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<TicketFilters>({
     city: "",
@@ -358,8 +359,10 @@ function App() {
   const [draggedId, setDraggedId] = useState<number | null>(null);
   const [toast, setToast] = useState("");
 
-  async function refreshData(showMessage = false) {
-    setLoading(true);
+  async function refreshData(showMessage = false, showLoading = true) {
+    if (refreshing.current) return;
+    refreshing.current = true;
+    if (showLoading) setLoading(true);
     try {
       const [apiTickets, apiIdeas] = await Promise.all([helpdeskApi.tickets(), helpdeskApi.ideas()]);
       setTickets(apiTickets.map(toUiTicket));
@@ -370,12 +373,17 @@ function App() {
       setApiOnline(false);
       if (showMessage) notify(error instanceof Error ? error.message : "Не удалось обновить данные");
     } finally {
-      setLoading(false);
+      refreshing.current = false;
+      if (showLoading) setLoading(false);
     }
   }
 
   useEffect(() => {
-    void refreshData(true);
+    void refreshData();
+    const interval = window.setInterval(() => {
+      void refreshData(false, false);
+    }, 10_000);
+    return () => window.clearInterval(interval);
   }, []);
 
   const visibleTickets = useMemo(() => {
