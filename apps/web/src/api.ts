@@ -48,6 +48,32 @@ export function saveApiUrl(value: string) {
   return normalized;
 }
 
+function formatStoredDateTime(date: string, time: string) {
+  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date ?? "");
+  const timeMatch = /^(\d{2}):(\d{2})(?::(\d{2}))?/.exec(time ?? "");
+  if (!dateMatch || !timeMatch) return null;
+
+  const utcDate = new Date(
+    `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}T${timeMatch[1]}:${timeMatch[2]}:${timeMatch[3] ?? "00"}Z`,
+  );
+  if (Number.isNaN(utcDate.getTime())) return null;
+
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Novosibirsk",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(utcDate);
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return {
+    date: `${values.day}.${values.month}.${values.year}`,
+    time: `${values.hour}:${values.minute}`,
+  };
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
@@ -120,12 +146,13 @@ export function toUiTicket(ticket: ApiTicket) {
     "В работе": "В работе",
     Закрыта: "Закрыта",
   };
+  const localizedDateTime = formatStoredDateTime(ticket.date, ticket.time);
   const dateParts = ticket.date?.slice(0, 10).split("-") ?? [];
   return {
     id: ticket.id,
     publicId: ticket.public_id,
-    date: dateParts.length === 3 ? `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}` : ticket.date,
-    time: ticket.time?.slice(0, 5) ?? "",
+    date: localizedDateTime?.date ?? (dateParts.length === 3 ? `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}` : ticket.date),
+    time: localizedDateTime?.time ?? ticket.time?.slice(0, 5) ?? "",
     employee: ticket.employee || "Не указано",
     telegram: ticket.employee_telegram_id || "—",
     city: ticket.city || "",
@@ -143,6 +170,7 @@ export function toUiTicket(ticket: ApiTicket) {
 }
 
 export function toUiIdea(idea: ApiIdea) {
+  const localizedDateTime = formatStoredDateTime(idea.date, idea.time);
   const dateParts = idea.date?.slice(0, 10).split("-") ?? [];
   const priority: Record<string, string> = {
     Low: "Низкий",
@@ -151,8 +179,8 @@ export function toUiIdea(idea: ApiIdea) {
   };
   return {
     id: idea.public_id,
-    date: dateParts.length === 3 ? `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}` : idea.date,
-    time: idea.time?.slice(0, 5) ?? "",
+    date: localizedDateTime?.date ?? (dateParts.length === 3 ? `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}` : idea.date),
+    time: localizedDateTime?.time ?? idea.time?.slice(0, 5) ?? "",
     employee: idea.employee || "Не указано",
     city: idea.city || "",
     department: idea.department || "",
