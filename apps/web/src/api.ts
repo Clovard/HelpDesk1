@@ -127,7 +127,7 @@ export function toUiTicket(ticket: ApiTicket) {
     date: dateParts.length === 3 ? `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}` : ticket.date,
     time: ticket.time?.slice(0, 5) ?? "",
     employee: ticket.employee || "Не указано",
-    telegram: ticket.employee_telegram_id ? `ID: ${ticket.employee_telegram_id}` : "—",
+    telegram: ticket.employee_telegram_id || "—",
     city: ticket.city || "",
     department: ticket.department || "",
     system: ticket.system || "",
