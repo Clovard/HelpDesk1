@@ -28,3 +28,11 @@ export function getConfirmKeyboard() {
         one_time_keyboard: true,
     };
 }
+
+export function getAttachmentsKeyboard() {
+    return {
+        keyboard: [[{ text: "✅ Готово" }, { text: "⏭ Пропустить" }], [{ text: "Отмена" }]],
+        resize_keyboard: true,
+        one_time_keyboard: false,
+    };
+}

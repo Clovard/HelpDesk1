@@ -19,6 +19,8 @@ export type ApiTicket = {
   assignee: string | null;
   scale: string | null;
   employee_telegram_id: string | null;
+  photo_count?: number;
+  file_count?: number;
 };
 
 export type ApiIdea = {
@@ -36,6 +38,8 @@ export type ApiIdea = {
   status: string;
   assignee: string | null;
   comment: string | null;
+  photo_count?: number;
+  file_count?: number;
 };
 
 export function getApiUrl() {
@@ -166,6 +170,8 @@ export function toUiTicket(ticket: ApiTicket) {
     level: ticket.support_level || "L1",
     assignee: ticket.assignee || "Андрей",
     scale: ticket.scale || "",
+    photoCount: ticket.photo_count ?? 0,
+    fileCount: ticket.file_count ?? 0,
   };
 }
 
@@ -191,6 +197,8 @@ export function toUiIdea(idea: ApiIdea) {
     status: idea.status === "New" ? "Новая" : idea.status,
     assignee: idea.assignee || "Андрей",
     comment: idea.comment || "",
+    photoCount: idea.photo_count ?? 0,
+    fileCount: idea.file_count ?? 0,
   };
 }
 

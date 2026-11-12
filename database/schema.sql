@@ -36,6 +36,8 @@ assignee TEXT,
 scale TEXT,
 
 employee_telegram_id TEXT,
+photo_count INTEGER NOT NULL DEFAULT 0,
+file_count INTEGER NOT NULL DEFAULT 0,
 
 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -66,6 +68,8 @@ comment TEXT,
 linked_ticket_id INTEGER,
 
 employee_telegram_id TEXT,
+photo_count INTEGER NOT NULL DEFAULT 0,
+file_count INTEGER NOT NULL DEFAULT 0,
 
 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,

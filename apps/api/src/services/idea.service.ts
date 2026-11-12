@@ -9,6 +9,8 @@ export type CreateIdeaInput = {
     expectedResult?: string;
     priority?: "Low" | "Medium" | "High";
     linkedTicketId?: number;
+    photoCount?: number;
+    fileCount?: number;
 };
 
 export async function listIdeas(env: Env) {
@@ -64,9 +66,11 @@ input: CreateIdeaInput,
         expected_result,
         priority,
         status,
-        linked_ticket_id
+        linked_ticket_id,
+        photo_count,
+        file_count
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     )
     .bind(
@@ -82,6 +86,8 @@ input: CreateIdeaInput,
     input.priority ?? "Medium",
     "New",
     input.linkedTicketId ?? null,
+    input.photoCount ?? 0,
+    input.fileCount ?? 0,
     )
     .run();
 

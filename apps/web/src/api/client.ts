@@ -15,6 +15,8 @@ export type Idea = {
     status: string;
     assignee: string | null;
     comment: string | null;
+    photo_count?: number;
+    file_count?: number;
 };
 
 const API_URL = import.meta.env.VITE_API_URL || "https://helpdesk-api.andrejsarafonov.workers.dev";

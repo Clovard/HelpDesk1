@@ -31,6 +31,8 @@ export class HelpdeskApiClient {
         employeeTelegramId?: string;
         expectedResult?: string;
         scale?: string;
+        photoCount?: number;
+        fileCount?: number;
     }) {
         const response = await fetch(
         `${this.apiUrl}/api/tickets`,
@@ -54,6 +56,8 @@ export class HelpdeskApiClient {
         idea: string;
         expectedResult?: string;
         priority?: "Low" | "Medium" | "High";
+        photoCount?: number;
+        fileCount?: number;
     }) {
         const response = await fetch(
         `${this.apiUrl}/api/ideas`,

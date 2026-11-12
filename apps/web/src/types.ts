@@ -27,4 +27,6 @@ export type Ticket = {
     created_at: string;
     updated_at: string;
     closed_at: string | null;
+    photo_count?: number;
+    file_count?: number;
 };

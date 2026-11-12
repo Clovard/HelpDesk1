@@ -30,6 +30,8 @@ type Ticket = {
   level: string;
   assignee: string;
   scale: string;
+  photoCount?: number;
+  fileCount?: number;
 };
 
 type Idea = {
@@ -46,7 +48,16 @@ type Idea = {
   status: string;
   assignee: string;
   comment: string;
+  photoCount?: number;
+  fileCount?: number;
 };
+
+function attachmentSummary(photoCount = 0, fileCount = 0) {
+  if (!photoCount && !fileCount) return "Нет вложений";
+  return [photoCount ? `Фото: ${photoCount}` : "", fileCount ? `Файлы: ${fileCount}` : ""]
+    .filter(Boolean)
+    .join(" · ");
+}
 
 const statuses: TicketStatus[] = ["Новая", "На рассмотрении", "В работе", "Закрыта"];
 const supportLevels = ["L1", "L2", "L3"];
@@ -1293,6 +1304,7 @@ function IdeasPage({
                   <th>Статус</th>
                   <th>Ответственный</th>
                   <th>Комментарий</th>
+                  <th>Вложения</th>
                 </tr>
               </thead>
               <tbody>
@@ -1325,6 +1337,7 @@ function IdeasPage({
                     </td>
                     <td>{idea.assignee}</td>
                     <td className="muted-cell">{idea.comment}</td>
+                    <td className="muted-cell">{attachmentSummary(idea.photoCount, idea.fileCount)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1510,15 +1523,15 @@ function SettingsPage({
             </div>
             <div className="connection-info">
               <div><span>Токен бота</span><strong>BOT_TOKEN · Cloudflare Secret</strong></div>
-              <div><span>ID рабочей группы</span><strong>CHAT_ID · Worker Variable</strong></div>
+              <div><span>ID рабочей группы поддержки</span><strong>SUPPORT_CHAT_ID · Worker Variable</strong></div>
             </div>
           </div>
           <footer>
-            <button className="button secondary" onClick={() => notify("Добавьте BOT_TOKEN как Secret, а CHAT_ID как Variable в настройках Telegram Worker") }>
+            <button className="button secondary" onClick={() => notify("Добавьте BOT_TOKEN как Secret, а SUPPORT_CHAT_ID как Variable в настройках Telegram Worker") }>
               <Icon name="send" size={16} />
               Где задать параметры
             </button>
-            <button className="button primary" onClick={() => notify("Настройте BOT_TOKEN и CHAT_ID в Cloudflare Worker")}>Инструкция подключения</button>
+            <button className="button primary" onClick={() => notify("Настройте BOT_TOKEN и SUPPORT_CHAT_ID в Cloudflare Worker")}>Инструкция подключения</button>
           </footer>
         </section>
       </div>
@@ -1927,6 +1940,7 @@ function TicketPanel({
                 editing={editing}
                 onChange={(value) => set("scale", value)}
               />
+              <DetailField label="Вложения" value={attachmentSummary(ticket.photoCount, ticket.fileCount)} />
             </div>
           </section>
           <section className="form-section">

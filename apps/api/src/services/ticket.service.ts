@@ -10,6 +10,8 @@ export type CreateTicketInput = {
     employeeTelegramId?: string;
     expectedResult?: string;
     scale?: string;
+    photoCount?: number;
+    fileCount?: number;
 };
 
 export type UpdateTicketInput = {
@@ -85,9 +87,11 @@ input: CreateTicketInput,
         support_level,
         assignee,
         employee_telegram_id,
-        scale
+        scale,
+        photo_count,
+        file_count
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     )
     .bind(
@@ -106,6 +110,8 @@ input: CreateTicketInput,
     "Андрей",
     input.employeeTelegramId ?? null,
     input.scale ?? null,
+    input.photoCount ?? 0,
+    input.fileCount ?? 0,
     )
     .run();
 

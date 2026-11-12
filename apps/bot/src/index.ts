@@ -24,6 +24,7 @@ type Env = {
     DB: D1Database;
     BOT_TOKEN: string;
     API_URL: string;
+    SUPPORT_CHAT_ID?: string;
 };
 
 export default {
@@ -42,13 +43,18 @@ export default {
 
         const message = update.message;
 
-        if (!message?.text) {
+        if (!message) {
             return new Response("OK");
         }
 
         const chatId = message.chat.id;
-        const text = message.text.trim();
+        const text = message.text?.trim() ?? "";
         const normalized = text.toLocaleLowerCase("ru").replace(/[✅✖❌🛠💡📋]/gu, "").trim();
+
+        if (text === "/chatid") {
+            await sendTelegramMessage(env.BOT_TOKEN, chatId, `ID этого чата: ${chatId}`);
+            return new Response("OK");
+        }
 
         // Reset stale ticket/idea sessions before any flow can consume the message as form data.
         if (text === "/start") {
@@ -56,7 +62,7 @@ export default {
             await handleStart(env.BOT_TOKEN, chatId, message.from?.first_name);
             return new Response("OK");
         }
-        if (["отмена", "cancel", "/cancel"].includes(normalized)) {
+        if (text && ["отмена", "cancel", "/cancel"].includes(normalized)) {
             await env.DB.prepare("DELETE FROM bot_sessions WHERE chat_id = ?").bind(String(chatId)).run();
             await sendTelegramMessage(env.BOT_TOKEN, chatId, "Действие отменено. Выберите, что сделать дальше:", getMainKeyboard());
             return new Response("OK");
@@ -82,7 +88,7 @@ export default {
             return new Response("OK");
         }
 
-        if ([MAIN_ACTIONS.myTickets, "Мои заявки", "My Tickets"].includes(text)) {
+        if (text && [MAIN_ACTIONS.myTickets, "Мои заявки", "My Tickets"].includes(text)) {
             await handleMyTickets(
             env,
             chatId,
@@ -92,6 +98,8 @@ export default {
 
             return new Response("OK");
         }
+
+        if (!text && !message.photo?.length && !message.document) return new Response("OK");
 
         await sendTelegramMessage(
         env.BOT_TOKEN,
