@@ -1492,7 +1492,10 @@ function Kanban({
                     <strong>{ticket.publicId}</strong>
                     <span className="kanban-level"><small>Уровень</small><b>{ticket.level || "—"}</b></span>
                   </div>
-                  <h3>{ticket.problem}</h3>
+                  <div className="kanban-problem">
+                    <small>Проблема</small>
+                    <h3 title={ticket.problem}>{ticket.problem || "Описание не указано"}</h3>
+                  </div>
                   <div className="kanban-fields">
                     <div><small>Система</small><strong title={ticket.system || "Не указана"}>{ticket.system || "Не указана"}</strong></div>
                     <div><small>Тип</small><strong title={ticket.type || "Не указан"}>{ticket.type || "Не указан"}</strong></div>
@@ -1615,7 +1618,10 @@ function IdeasPage({
                 <div className="kanban-stack">
                   {columnIdeas.map((idea) => <article className="kanban-card" key={idea.rowId} draggable onDragStart={() => onDragStart(idea.rowId)} onClick={() => onOpen(idea)}>
                     <div className="kanban-top"><strong>{idea.id}</strong><span className={`priority ${idea.priority === "Высокий" ? "high" : ""}`}>{idea.priority}</span></div>
-                    <h3>{idea.idea}</h3>
+                    <div className="kanban-problem">
+                      <small>Предложение</small>
+                      <h3 title={idea.idea}>{idea.idea}</h3>
+                    </div>
                     <div className="kanban-fields">
                       <div><small>Система</small><strong title={idea.system || "Не указана"}>{idea.system || "Не указана"}</strong></div>
                       <div><small>Город</small><strong title={idea.city || "Не указан"}>{idea.city || "Не указан"}</strong></div>

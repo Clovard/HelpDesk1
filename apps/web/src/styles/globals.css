@@ -1347,12 +1347,24 @@ tbody tr:last-child td {
   font-size: 13px;
   line-height: 1.2;
 }
-.kanban-card h3 {
-  min-height: 42px;
+.kanban-problem {
+  min-height: 78px;
   margin: 13px 0 12px;
+}
+.kanban-problem > small {
+  color: #858b97;
+  font-size: 10px;
+  font-weight: 600;
+}
+.kanban-card h3 {
+  margin: 3px 0 0;
   color: #343434;
   font-size: 14px;
   line-height: 1.45;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
   overflow-wrap: anywhere;
 }
 .kanban-fields {
