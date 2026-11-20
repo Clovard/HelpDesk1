@@ -31,7 +31,6 @@ export type ApiTicket = {
   system: string | null;
   type: string | null;
   problem: string;
-  expected_result: string | null;
   status: string;
   it_comment: string | null;
   support_level: string | null;
@@ -194,7 +193,6 @@ export function toUiTicket(ticket: ApiTicket) {
     system: ticket.system || "",
     type: ticket.type || "",
     problem: ticket.problem,
-    expected: ticket.expected_result || "",
     status: status[ticket.status] || "Новая",
     comment: ticket.it_comment || "",
     level: ticketLevelForAssignee(assignee) || ticket.support_level || "L1",

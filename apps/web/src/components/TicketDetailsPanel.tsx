@@ -21,7 +21,6 @@ type TicketDraft = {
     system: string;
     type: string;
     problem: string;
-    expectedResult: string;
     status: TicketStatus;
     itComment: string;
     supportLevel: string;
@@ -39,7 +38,6 @@ function createDraft(ticket: Ticket): TicketDraft {
         system: ticket.system || "",
         type: ticket.type || "",
         problem: ticket.problem,
-        expectedResult: ticket.expected_result || "",
         status: ticket.status,
         itComment: ticket.it_comment || "",
         supportLevel: ticket.support_level || "",
@@ -81,7 +79,6 @@ export default function TicketDetailsPanel({ ticket, onClose, onSaved, onDeleted
                 department: draft.department || null,
                 system: draft.system || null,
                 type: draft.type || null,
-                expectedResult: draft.expectedResult || null,
                 itComment: draft.itComment || null,
                 supportLevel: draft.supportLevel || null,
                 assignee: draft.assignee || null,
@@ -172,10 +169,6 @@ export default function TicketDetailsPanel({ ticket, onClose, onSaved, onDeleted
                     <label className="details-field full-field">
                         <span>Проблема / ситуация</span>
                         {editing ? <textarea value={draft.problem} onChange={(event) => setField("problem", event.target.value)} /> : <p>{draft.problem || "—"}</p>}
-                    </label>
-                    <label className="details-field full-field">
-                        <span>Ожидаемый результат</span>
-                        {editing ? <textarea value={draft.expectedResult} onChange={(event) => setField("expectedResult", event.target.value)} /> : <p>{draft.expectedResult || "—"}</p>}
                     </label>
                 </section>
 

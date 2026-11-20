@@ -16,7 +16,7 @@ export class HelpdeskApiClient {
         } catch {
             return {
                 ok: false,
-                error: `API вернул не JSON (HTTP ${response.status}): ${body.slice(0, 180) || "пустой ответ"}`,
+                error: `Сервер вернул некорректный ответ (HTTP ${response.status}).`,
             };
         }
     }
@@ -29,7 +29,6 @@ export class HelpdeskApiClient {
         type?: string;
         problem: string;
         employeeTelegramId?: string;
-        expectedResult?: string;
         scale?: string;
     }) {
         const response = await fetch(

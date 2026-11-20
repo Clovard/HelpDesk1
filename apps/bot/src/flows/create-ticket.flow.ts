@@ -80,7 +80,7 @@ export async function handleCreateTicketFlow(env: BotEnv, message: TelegramMessa
             state: "city",
             data: {
                 employee,
-                telegramId: from?.username ? `@${from.username} (ID: ${from.id})` : `ID: ${from?.id ?? chatId}`,
+                telegramId: from?.username ? `@${from.username} (идентификатор: ${from.id})` : `Идентификатор: ${from?.id ?? chatId}`,
             },
         };
         await saveSession(env, chatId, session);
@@ -108,7 +108,7 @@ export async function handleCreateTicketFlow(env: BotEnv, message: TelegramMessa
         }) as { ok: boolean; publicId?: string; ticket?: { public_id?: string }; error?: string };
         await deleteSession(env, chatId);
         if (!result.ok) {
-            await sendTelegramMessage(env.BOT_TOKEN, chatId, `Не удалось создать заявку: ${result.error || "ошибка сервера"}`);
+            await sendTelegramMessage(env.BOT_TOKEN, chatId, "Не удалось создать заявку. Попробуйте ещё раз позже.", getMainKeyboard());
             return true;
         }
         const publicId = result.publicId || result.ticket?.public_id || "создана";
@@ -126,8 +126,8 @@ export async function handleCreateTicketFlow(env: BotEnv, message: TelegramMessa
         ].join("\n");
         const supportDelivery = await sendToSupportChat(env.BOT_TOKEN, env.SUPPORT_CHAT_ID, publicId, summary, []);
         let deliveryNote = "";
-        if (!supportDelivery.configured) deliveryNote = "\nУведомление в рабочую группу не отправлено: в Worker не задан SUPPORT_CHAT_ID.";
-        else if (!supportDelivery.summarySent) deliveryNote = "\nНе удалось отправить копию в рабочую группу. Проверьте chat ID и права бота.";
+        if (!supportDelivery.configured) deliveryNote = "\nУведомление в рабочую группу не отправлено: не задан её идентификатор.";
+        else if (!supportDelivery.summarySent) deliveryNote = "\nНе удалось отправить копию в рабочую группу. Проверьте её идентификатор и права бота.";
         await sendTelegramMessage(env.BOT_TOKEN, chatId, `✅ Заявка создана!\nНомер: ${publicId}${deliveryNote}`, getMainKeyboard());
         return true;
     }

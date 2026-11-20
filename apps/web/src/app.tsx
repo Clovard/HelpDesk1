@@ -26,7 +26,6 @@ type Ticket = {
   system: string;
   type: string;
   problem: string;
-  expected: string;
   status: TicketStatus;
   comment: string;
   level: string;
@@ -85,7 +84,6 @@ const initialTickets: Ticket[] = [
     system: "1С",
     type: "Ошибка",
     problem: "Не формируется отчёт по продажам за текущий месяц",
-    expected: "Отчёт формируется без ошибок",
     status: "Новая",
     comment: "",
     level: "L1",
@@ -104,7 +102,6 @@ const initialTickets: Ticket[] = [
     system: "ПК",
     type: "Ошибка",
     problem: "Принтер не забирает бумагу из кассеты",
-    expected: "Печать документов восстановлена",
     status: "В работе",
     comment: "Проверяем ролик подачи бумаги",
     level: "L1",
@@ -123,7 +120,6 @@ const initialTickets: Ticket[] = [
     system: "Битрикс24",
     type: "Доступ",
     problem: "Нет доступа к разделу с договорами",
-    expected: "Получить права на просмотр и загрузку",
     status: "На рассмотрении",
     comment: "Запрошено согласование руководителя",
     level: "L2",
@@ -142,7 +138,6 @@ const initialTickets: Ticket[] = [
     system: "WMS",
     type: "Консультация",
     problem: "Нужно настроить новый шаблон этикетки",
-    expected: "Печать этикетки формата 100×70 мм",
     status: "Закрыта",
     comment: "Шаблон добавлен и протестирован",
     level: "L1",
@@ -161,7 +156,6 @@ const initialTickets: Ticket[] = [
     system: "VPN",
     type: "Ошибка",
     problem: "VPN отключается через несколько минут работы",
-    expected: "Стабильное подключение из дома",
     status: "В работе",
     comment: "Диагностика соединения",
     level: "L3",
@@ -180,7 +174,6 @@ const initialTickets: Ticket[] = [
     system: "Почта",
     type: "Настройка",
     problem: "Настроить общую подпись для отдела",
-    expected: "Единая подпись у всей команды",
     status: "Закрыта",
     comment: "Шаблон применён",
     level: "L2",
@@ -470,7 +463,6 @@ function App() {
         system: updated.system,
         type: updated.type,
         problem: updated.problem,
-        expectedResult: updated.expected,
         status: toApiStatus(updated.status),
         itComment: updated.comment,
         supportLevel: updated.level,
@@ -496,7 +488,6 @@ function App() {
         system: ticket.system,
         type: ticket.type,
         problem: ticket.problem,
-        expectedResult: ticket.expected,
         scale: ticket.scale,
       });
       setTickets((current) => [toUiTicket(created), ...current]);
@@ -629,7 +620,6 @@ function App() {
           "Система",
           "Тип",
           "Проблема / ситуация",
-          "Ожидаемый результат",
           "Статус IT",
           "Комментарий IT",
           "Уровень",
@@ -646,7 +636,6 @@ function App() {
           ticket.system,
           ticket.type,
           ticket.problem,
-          ticket.expected,
           ticket.status,
           ticket.comment || "—",
           ticket.level,
@@ -1148,7 +1137,6 @@ function TicketTable({
               <th>Система</th>
               <th>Тип</th>
               <th className="problem-col">Проблема / ситуация</th>
-              <th>Ожидаемый результат</th>
               <th>Статус IT</th>
               <th>Комментарий IT</th>
               <th>Уровень</th>
@@ -1191,7 +1179,6 @@ function TicketTable({
                 </td>
                 <td>{ticket.type}</td>
                 <td className="problem-cell">{ticket.problem}</td>
-                <td className="muted-cell">{ticket.expected}</td>
                 <td>
                   <StatusBadge status={ticket.status} />
                 </td>
@@ -1504,7 +1491,7 @@ function CreateIdeaPanel({
             <section className="form-section">
               <div className="section-heading"><span>02</span><div><h3>Суть предложения</h3><p>Что стоит улучшить и зачем</p></div></div>
               <Field label="Идея / предложение" required textarea value={form.idea} onChange={(value) => set("idea", value)} placeholder="Опишите предложение…" />
-              <Field label="Ожидаемый результат" textarea value={form.expected} onChange={(value) => set("expected", value)} placeholder="Какой результат это даст?" />
+              <Field label="Ожидаемый результат" required textarea value={form.expected} onChange={(value) => set("expected", value)} placeholder="Какой результат это даст?" />
             </section>
           </div>
           <footer className="panel-footer"><span><b>*</b> Обязательные поля</span><div><button type="button" className="button secondary" onClick={onClose}>Отмена</button><button className="button primary" type="submit">Сохранить идею</button></div></footer>
@@ -1859,7 +1846,6 @@ function CreateTicketPanel({
     type: "",
     scale: "",
     problem: "",
-    expected: "",
   });
   const set = (key: keyof typeof form, value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -1878,7 +1864,6 @@ function CreateTicketPanel({
       system: form.system,
       type: form.type,
       problem: form.problem,
-      expected: form.expected,
       status: "Новая",
       comment: "",
       level: "L1",
@@ -1969,7 +1954,7 @@ function CreateTicketPanel({
                 <span>02</span>
                 <div>
                   <h3>Описание обращения</h3>
-                  <p>Что произошло и какой результат ожидается</p>
+                  <p>Опишите, что произошло</p>
                 </div>
               </div>
               <Field
@@ -1979,13 +1964,6 @@ function CreateTicketPanel({
                 value={form.problem}
                 onChange={(value) => set("problem", value)}
                 placeholder="Опишите проблему как можно подробнее…"
-              />
-              <Field
-                label="Ожидаемый результат"
-                textarea
-                value={form.expected}
-                onChange={(value) => set("expected", value)}
-                placeholder="Что должно измениться после решения?"
               />
             </section>
           </div>
@@ -2144,7 +2122,7 @@ function TicketPanel({
               <span>02</span>
               <div>
                 <h3>Описание</h3>
-                <p>Ситуация и ожидаемый результат</p>
+                <p>Описание проблемы сотрудника</p>
               </div>
             </div>
             <DetailField
@@ -2153,13 +2131,6 @@ function TicketPanel({
               editing={editing}
               textarea
               onChange={(value) => set("problem", value)}
-            />
-            <DetailField
-              label="Ожидаемый результат"
-              value={draft.expected}
-              editing={editing}
-              textarea
-              onChange={(value) => set("expected", value)}
             />
           </section>
           <section className="form-section">

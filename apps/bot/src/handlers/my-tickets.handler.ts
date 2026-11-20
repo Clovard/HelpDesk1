@@ -29,19 +29,26 @@ employeeName: string,
         await sendTelegramMessage(
         env.BOT_TOKEN,
         chatId,
-        "You do not have any tickets yet.",
+        "У вас пока нет заявок.",
         );
 
         return;
     }
 
+    const statusLabels: Record<string, string> = {
+        New: "Новая",
+        "Under Review": "На рассмотрении",
+        "In Progress": "В работе",
+        Closed: "Закрыта",
+    };
+
     const message = tickets
     .slice(0, 20)
     .map((ticket) => {
         return [
-        `ID: ${ticket.public_id}`,
-        `Status: ${ticket.status}`,
-        `Problem: ${ticket.problem}`,
+        `Номер: ${ticket.public_id}`,
+        `Статус: ${statusLabels[ticket.status] || ticket.status}`,
+        `Проблема: ${ticket.problem}`,
         ].join("\n");
     })
     .join("\n\n");
@@ -49,6 +56,6 @@ employeeName: string,
     await sendTelegramMessage(
     env.BOT_TOKEN,
     chatId,
-    `Your tickets:\n\n${message}`,
+    `Ваши заявки:\n\n${message}`,
     );
 }

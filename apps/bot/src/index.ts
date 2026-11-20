@@ -34,7 +34,7 @@ export default {
     ): Promise<Response> {
         if (request.method !== "POST") {
             return new Response(
-            "Helpdesk Bot is running",
+            "Бот поддержки работает",
             );
         }
 
@@ -58,7 +58,7 @@ export default {
         const normalized = text.toLocaleLowerCase("ru").replace(/[✅✖❌🛠💡📋]/gu, "").trim();
 
         if (text === "/chatid") {
-            await sendTelegramMessage(env.BOT_TOKEN, chatId, `ID этого чата: ${chatId}`);
+            await sendTelegramMessage(env.BOT_TOKEN, chatId, `Идентификатор этого чата: ${chatId}`);
             return new Response("OK");
         }
 

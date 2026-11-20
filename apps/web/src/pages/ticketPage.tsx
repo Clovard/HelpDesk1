@@ -103,7 +103,6 @@ export default function TicketPage() {
                                 <th>Система</th>
                                 <th>Тип</th>
                                 <th>Проблема / ситуация</th>
-                                <th>Ожидаемый результат</th>
                                 <th>Статус IT</th>
                                 <th>Комментарий IT</th>
                                 <th>Уровень</th>
@@ -123,7 +122,6 @@ export default function TicketPage() {
                                 <td>{ticket.system || ""}</td>
                                 <td>{ticket.type || ""}</td>
                                 <td className="wide-cell">{ticket.problem}</td>
-                                <td className="wide-cell">{ticket.expected_result || ""}</td>
                                 <td>
                                     <select
                                         className={"status-select status-" + ticket.status.toLowerCase().replaceAll(" ", "-")}

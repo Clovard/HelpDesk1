@@ -117,7 +117,7 @@ export async function handleCreateIdeaFlow(env: BotEnv, message: TelegramMessage
         }) as { ok: boolean; publicId?: string; error?: string };
         await deleteSession(env, chatId);
         if (!result.ok) {
-            await sendTelegramMessage(env.BOT_TOKEN, chatId, `Не удалось создать идею: ${result.error || "ошибка сервера"}`);
+            await sendTelegramMessage(env.BOT_TOKEN, chatId, "Не удалось создать идею. Попробуйте ещё раз позже.", getMainKeyboard());
             return true;
         }
         const publicId = result.publicId || "создана";
@@ -130,9 +130,9 @@ export async function handleCreateIdeaFlow(env: BotEnv, message: TelegramMessage
         ].join("\n");
         const delivery = await sendToSupportChat(env.BOT_TOKEN, env.SUPPORT_CHAT_ID, publicId, summary, []);
         const note = !delivery.configured
-            ? "\nКопия в рабочую группу не отправлена: не задан SUPPORT_CHAT_ID."
+            ? "\nКопия в рабочую группу не отправлена: не задан её идентификатор."
             : !delivery.summarySent
-                ? "\nНе удалось отправить копию в группу. Проверьте chat ID и права бота."
+                ? "\nНе удалось отправить копию в группу. Проверьте её идентификатор и права бота."
                 : "";
         await sendTelegramMessage(env.BOT_TOKEN, chatId, `✅ Идея создана!\nНомер: ${publicId}${note}`, getMainKeyboard());
         return true;

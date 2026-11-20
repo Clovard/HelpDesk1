@@ -8,7 +8,6 @@ export type CreateTicketInput = {
     type?: string;
     problem: string;
     employeeTelegramId?: string;
-    expectedResult?: string;
     scale?: string;
 };
 
@@ -37,7 +36,6 @@ export type UpdateTicketInput = {
     system?: string | null;
     type?: string | null;
     problem?: string;
-    expectedResult?: string | null;
     status?: string;
     itComment?: string | null;
     supportLevel?: "L1" | "L2" | "L3" | null;
@@ -96,14 +94,13 @@ input: CreateTicketInput,
         system,
         type,
         problem,
-        expected_result,
         status,
         support_level,
         assignee,
         employee_telegram_id,
         scale
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     )
     .bind(
@@ -116,7 +113,6 @@ input: CreateTicketInput,
     input.system ?? null,
     input.type ?? null,
     input.problem,
-    input.expectedResult ?? null,
     "New",
     "L1",
     "Андрей",
@@ -153,7 +149,6 @@ input: UpdateTicketInput,
     system: string | null;
     type: string | null;
     problem: string;
-    expected_result: string | null;
     status: string;
     it_comment: string | null;
     support_level: string | null;
@@ -173,7 +168,6 @@ input: UpdateTicketInput,
     const nextSystem = input.system === undefined ? current.system : input.system;
     const nextType = input.type === undefined ? current.type : input.type;
     const nextProblem = input.problem ?? current.problem;
-    const nextExpectedResult = input.expectedResult === undefined ? current.expected_result : input.expectedResult;
     const nextStatus = input.status ?? current.status;
     const nextComment = input.itComment === undefined ? current.it_comment : input.itComment;
     const currentAssignee = normalizeAssignee(current.assignee);
@@ -202,7 +196,6 @@ input: UpdateTicketInput,
         system = ?,
         type = ?,
         problem = ?,
-        expected_result = ?,
         status = ?,
         it_comment = ?,
         support_level = ?,
@@ -226,7 +219,6 @@ input: UpdateTicketInput,
     nextSystem,
     nextType,
     nextProblem,
-    nextExpectedResult,
     nextStatus,
     nextComment,
     nextLevel,

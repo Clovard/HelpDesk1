@@ -15,7 +15,6 @@ export default function CreateTicketPanel({ onClose, onCreated }: Props) {
         system: "",
         type: "",
         problem: "",
-        expectedResult: "",
         scale: "",
     });
     const [saving, setSaving] = useState(false);
@@ -68,7 +67,6 @@ export default function CreateTicketPanel({ onClose, onCreated }: Props) {
                     <section className="details-section">
                         <h3>Описание проблемы</h3>
                         <label className="details-field full-field"><span>Проблема / ситуация *</span><textarea required value={form.problem} onChange={(event) => setField("problem", event.target.value)} /></label>
-                        <label className="details-field full-field"><span>Ожидаемый результат</span><textarea value={form.expectedResult} onChange={(event) => setField("expectedResult", event.target.value)} /></label>
                     </section>
                     <div className="details-actions"><button type="button" className="secondary-button" onClick={onClose}>Отмена</button><button type="submit" className="primary-button" disabled={saving}>{saving ? "Создание..." : "Создать заявку"}</button></div>
                 </form>

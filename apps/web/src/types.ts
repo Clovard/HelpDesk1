@@ -18,7 +18,6 @@ export type Ticket = {
     system: string | null;
     type: string | null;
     problem: string;
-    expected_result: string | null;
     status: TicketStatus;
     it_comment: string | null;
     support_level: SupportLevel;

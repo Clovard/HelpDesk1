@@ -50,7 +50,6 @@ export async function createTicket(data: {
     system?: string;
     type?: string;
     problem: string;
-    expectedResult?: string;
     scale?: string;
 }) {
     return request<{ ok: boolean; ticket: Ticket }>("/api/tickets", {
@@ -68,7 +67,6 @@ export async function updateTicket(id: number, data: {
     system?: string | null;
     type?: string | null;
     problem?: string;
-    expectedResult?: string | null;
     status?: string;
     itComment?: string | null;
     supportLevel?: string | null;
