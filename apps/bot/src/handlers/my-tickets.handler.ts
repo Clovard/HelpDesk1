@@ -133,10 +133,117 @@ export async function startTicketChat(env: BotEnv, chatId: number, ticketId: num
     return true;
 }
 
+async function handleTicketClosureCallback(
+    env: BotEnv,
+    callback: NonNullable<TelegramUpdate["callback_query"]>,
+) {
+    const match = /^ticket_closed:(\d+):(yes|no)$/.exec(callback.data ?? "");
+    if (!match) return false;
+    if (!callback.message || callback.message.chat.type !== "private") {
+        await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Подтверждение доступно только в личном чате с ботом.");
+        return true;
+    }
+
+    const ticketId = Number(match[1]);
+    const decision = match[2] as "yes" | "no";
+    const telegramUserId = String(callback.from.id);
+    const ticket = await env.DB.prepare(`
+        SELECT id, public_id, employee, status
+        FROM tickets
+        WHERE id = ? AND (
+            telegram_user_id = ? OR
+            (telegram_user_id IS NULL AND (
+                employee_telegram_id = ? OR employee_telegram_id = ? OR
+                employee_telegram_id LIKE ? OR employee_telegram_id LIKE ?
+            ))
+        )
+    `).bind(
+        ticketId,
+        telegramUserId,
+        `ID: ${telegramUserId}`,
+        `Идентификатор: ${telegramUserId}`,
+        `%ID: ${telegramUserId})%`,
+        `%идентификатор: ${telegramUserId})%`,
+    ).first<{ id: number; public_id: string; employee: string; status: string }>();
+
+    if (!ticket) {
+        await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Заявка не найдена в вашем аккаунте.");
+        return true;
+    }
+    if (ticket.status !== "Closed") {
+        await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Статус заявки уже изменён.");
+        return true;
+    }
+
+    const senderName = [callback.from.first_name, callback.from.last_name].filter(Boolean).join(" ").trim()
+        || (callback.from.username ? `@${callback.from.username}` : "Сотрудник");
+    const confirmation = decision === "yes"
+        ? "Сотрудник подтвердил, что проблема решена."
+        : "Сотрудник сообщил, что проблема осталась.";
+    const inserted = await env.DB.prepare(`
+        INSERT OR IGNORE INTO ticket_messages (
+            ticket_id, sender_type, sender_telegram_id, telegram_message_id, sender_name, body
+        ) VALUES (?, 'employee', ?, ?, ?, ?)
+    `).bind(
+        ticket.id,
+        telegramUserId,
+        callback.message.message_id,
+        senderName,
+        confirmation,
+    ).run();
+
+    if (inserted.meta.changes === 0) {
+        await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Ваш ответ уже учтён.");
+        return true;
+    }
+
+    let reopened = false;
+    if (decision === "no") {
+        const update = await env.DB.prepare(`
+            UPDATE tickets
+            SET status = 'In Progress', closed_at = NULL, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND status = 'Closed'
+        `).bind(ticket.id).run();
+        reopened = update.meta.changes > 0;
+
+        if (reopened) {
+            await env.DB.prepare(`
+                INSERT INTO ticket_events (ticket_id, event_type, old_value, new_value, author_name)
+                VALUES (?, 'status_changed', 'Closed', 'In Progress', ?)
+            `).bind(ticket.id, senderName).run();
+            if (env.SUPPORT_CHAT_ID) {
+                await sendTelegramMessage(
+                    env.BOT_TOKEN,
+                    env.SUPPORT_CHAT_ID,
+                    `⚠️ Сотрудник сообщил, что заявка ${ticket.public_id} не решена. Статус возвращён в «В работе».\nСотрудник: ${senderName}`,
+                );
+            }
+        }
+    }
+
+    const resultText = decision === "yes"
+        ? "✅ Вы подтвердили, что проблема решена. Спасибо!"
+        : reopened
+            ? "❌ Вы сообщили, что проблема осталась. Заявка возвращена в работу."
+            : "Ответ получен, но статус заявки уже изменился. Специалист проверит её.";
+    await answerTelegramCallback(env.BOT_TOKEN, callback.id, decision === "yes" ? "Спасибо за подтверждение" : "Передали специалисту");
+    await editTelegramMessage(
+        env.BOT_TOKEN,
+        callback.message.chat.id,
+        callback.message.message_id,
+        `${callback.message.text ?? `Заявка ${ticket.public_id}` }\n\n${resultText}`,
+        { inline_keyboard: [] },
+    );
+    await sendTelegramMessage(env.BOT_TOKEN, callback.message.chat.id, resultText, getMainKeyboard());
+    return true;
+}
+
 export async function handleTicketChatCallback(
     env: BotEnv,
     callback: NonNullable<TelegramUpdate["callback_query"]>,
 ) {
+    if (await handleTicketClosureCallback(env, callback)) return true;
+
     const pageMatch = /^tickets_page:(active|closed):(\d+)$/.exec(callback.data ?? "");
     if (pageMatch && callback.message?.chat.type === "private") {
         await answerTelegramCallback(env.BOT_TOKEN, callback.id);

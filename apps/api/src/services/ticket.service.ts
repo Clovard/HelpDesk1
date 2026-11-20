@@ -18,6 +18,49 @@ const assigneeByLevel: Record<"L1" | "L2" | "L3", string> = {
     L3: "Пентагон",
 };
 
+async function notifyEmployeeToConfirmClosure(env: Env, ticket: {
+    id: number;
+    public_id: string;
+    problem: string;
+    telegram_user_id: string | null;
+    employee_telegram_id: string | null;
+}) {
+    if (!env.BOT_TOKEN) return;
+    const telegramId = ticket.telegram_user_id
+        ?? /(?:ID|идентификатор)\s*:\s*(\d+)/i.exec(ticket.employee_telegram_id ?? "")?.[1];
+    if (!telegramId) return;
+
+    try {
+        const response = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                chat_id: telegramId,
+                text: `Заявка ${ticket.public_id} отмечена как закрытая. Подтвердите, пожалуйста, проблема действительно решена?`,
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: "✅ Да, проблема решена", callback_data: `ticket_closed:${ticket.id}:yes` }],
+                        [{ text: "❌ Нет, проблема осталась", callback_data: `ticket_closed:${ticket.id}:no` }],
+                    ],
+                },
+            }),
+        });
+        const result = await response.json() as { ok?: boolean; description?: string };
+        if (!response.ok || result.ok !== true) {
+            console.error("Telegram closure confirmation delivery failed", {
+                ticketId: ticket.id,
+                status: response.status,
+                description: result.description,
+            });
+        }
+    } catch (error) {
+        console.error("Telegram closure confirmation delivery failed", {
+            ticketId: ticket.id,
+            error: error instanceof Error ? error.message : "unknown error",
+        });
+    }
+}
+
 function normalizeAssignee(value: string | null | undefined) {
     const normalized = value?.trim().toLocaleLowerCase("ru") ?? "";
     if (["тёма", "тема", "артем", "артём", "tema", "artem"].includes(normalized)) return "Артём";
@@ -144,6 +187,7 @@ input: UpdateTicketInput,
     )
     .bind(id)
     .first<{
+    public_id: string;
     date: string;
     time: string;
     employee: string;
@@ -157,6 +201,8 @@ input: UpdateTicketInput,
     support_level: string | null;
     assignee: string | null;
     scale: string | null;
+    telegram_user_id: string | null;
+    employee_telegram_id: string | null;
     }>();
 
     if (!current) {
@@ -253,6 +299,16 @@ input: UpdateTicketInput,
         "Helpdesk",
         )
         .run();
+    }
+
+    if (current.status !== "Closed" && nextStatus === "Closed") {
+        await notifyEmployeeToConfirmClosure(env, {
+            id,
+            public_id: current.public_id,
+            problem: nextProblem,
+            telegram_user_id: current.telegram_user_id,
+            employee_telegram_id: current.employee_telegram_id,
+        });
     }
 
     return getTicketById(env, id);
