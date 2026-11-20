@@ -29,6 +29,7 @@ export class HelpdeskApiClient {
         type?: string;
         problem: string;
         employeeTelegramId?: string;
+        telegramUserId?: string;
         scale?: string;
     }) {
         const response = await fetch(

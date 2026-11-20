@@ -23,6 +23,12 @@ export type TelegramAttachment = {
 export type TelegramUpdate = {
     update_id: number;
     message?: TelegramMessage;
+    callback_query?: {
+        id: string;
+        from: NonNullable<TelegramMessage["from"]>;
+        message?: TelegramMessage;
+        data?: string;
+    };
 };
 
 export function getTelegramAttachment(message: TelegramMessage): TelegramAttachment | null {
@@ -72,6 +78,13 @@ replyMarkup?: unknown,
         chat_id: chatId,
         text,
         reply_markup: replyMarkup,
+    });
+}
+
+export async function answerTelegramCallback(token: string, callbackQueryId: string, text?: string) {
+    return callTelegram(token, "answerCallbackQuery", {
+        callback_query_id: callbackQueryId,
+        text,
     });
 }
 

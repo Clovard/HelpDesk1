@@ -36,6 +36,7 @@ assignee TEXT,
 scale TEXT,
 
 employee_telegram_id TEXT,
+telegram_user_id TEXT,
 photo_count INTEGER NOT NULL DEFAULT 0,
 file_count INTEGER NOT NULL DEFAULT 0,
 
@@ -93,6 +94,26 @@ REFERENCES tickets(id)
 ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS ticket_messages (
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+ticket_id INTEGER NOT NULL,
+sender_type TEXT NOT NULL CHECK (sender_type IN ('employee', 'support')),
+sender_telegram_id TEXT,
+telegram_message_id INTEGER,
+sender_name TEXT NOT NULL,
+body TEXT NOT NULL,
+telegram_status TEXT NOT NULL DEFAULT 'not_required',
+created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS bot_ticket_chats (
+chat_id TEXT PRIMARY KEY,
+ticket_id INTEGER NOT NULL,
+updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS ticket_events (
 id INTEGER PRIMARY KEY AUTOINCREMENT,
 
@@ -141,6 +162,16 @@ ON ideas(status);
 
 CREATE INDEX IF NOT EXISTS idx_comments_ticket_id
 ON comments(ticket_id);
+
+CREATE INDEX IF NOT EXISTS idx_tickets_telegram_user
+ON tickets(telegram_user_id);
+
+CREATE INDEX IF NOT EXISTS idx_ticket_messages_ticket_created
+ON ticket_messages(ticket_id, created_at, id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ticket_messages_telegram_update
+ON ticket_messages(sender_telegram_id, telegram_message_id)
+WHERE telegram_message_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_ticket_events_ticket_id
 ON ticket_events(ticket_id);

@@ -4,6 +4,8 @@ handleStart,
 
 import {
 handleMyTickets,
+handleTicketChatCallback,
+handleTicketChatMessage,
 } from "./handlers/my-tickets.handler";
 
 import {
@@ -40,6 +42,11 @@ export default {
 
         const update =
         await request.json<TelegramUpdate>();
+
+        if (update.callback_query) {
+            await handleTicketChatCallback(env, update.callback_query);
+            return new Response("OK");
+        }
 
         const message = update.message;
 
@@ -98,10 +105,13 @@ export default {
             await handleMyTickets(
             env,
             chatId,
-            message.from?.first_name ||
-            "Сотрудник",
+            String(message.from?.id ?? chatId),
             );
 
+            return new Response("OK");
+        }
+
+        if (await handleTicketChatMessage(env, message)) {
             return new Response("OK");
         }
 

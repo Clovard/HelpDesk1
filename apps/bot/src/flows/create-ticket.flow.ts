@@ -5,7 +5,7 @@ import { sendToSupportChat } from "../support-chat";
 
 type BotEnv = { DB: D1Database; API_URL: string; BOT_TOKEN: string; SUPPORT_CHAT_ID?: string };
 type TicketSessionState = "city" | "department" | "system" | "type" | "problem" | "confirmation";
-type TicketSessionData = { employee?: string; telegramId?: string; city?: string; department?: string; system?: string; type?: string; problem?: string };
+type TicketSessionData = { employee?: string; telegramId?: string; telegramUserId?: string; city?: string; department?: string; system?: string; type?: string; problem?: string };
 type TicketSession = { state: TicketSessionState; data: TicketSessionData };
 
 const cities = ["Новосибирск", "Красноярск", "Томск", "Кемерово", "Барнаул"];
@@ -81,6 +81,7 @@ export async function handleCreateTicketFlow(env: BotEnv, message: TelegramMessa
             data: {
                 employee,
                 telegramId: from?.username ? `@${from.username} (идентификатор: ${from.id})` : `Идентификатор: ${from?.id ?? chatId}`,
+                telegramUserId: from?.id === undefined ? undefined : String(from.id),
             },
         };
         await saveSession(env, chatId, session);
@@ -105,6 +106,7 @@ export async function handleCreateTicketFlow(env: BotEnv, message: TelegramMessa
             employee: session.data.employee!, city: session.data.city, department: session.data.department,
             system: session.data.system, type: session.data.type, problem: session.data.problem!,
             employeeTelegramId: session.data.telegramId,
+            telegramUserId: session.data.telegramUserId,
         }) as { ok: boolean; publicId?: string; ticket?: { public_id?: string }; error?: string };
         await deleteSession(env, chatId);
         if (!result.ok) {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { getApiUrl, helpdeskApi, normalizeTicketAssignee, saveApiUrl, ticketAssigneeForLevel, ticketLevelForAssignee, toApiStatus, toUiIdea, toUiTicket } from "./api";
+import { getApiUrl, helpdeskApi, normalizeTicketAssignee, saveApiUrl, ticketAssigneeForLevel, ticketLevelForAssignee, toApiStatus, toUiIdea, toUiTicket, type ApiTicketMessage } from "./api";
 
 type View = "tickets" | "ideas" | "settings";
 type TicketView = "list" | "kanban";
@@ -21,6 +21,7 @@ type Ticket = {
   time: string;
   employee: string;
   telegram: string;
+  telegramUserId: string;
   city: string;
   department: string;
   system: string;
@@ -61,6 +62,18 @@ function attachmentSummary(photoCount = 0, fileCount = 0) {
     .join(" · ");
 }
 
+function formatTicketChatTime(value: string) {
+  const date = new Date(`${value.replace(" ", "T")}Z`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("ru-RU", {
+    timeZone: "Asia/Novosibirsk",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 const statuses: TicketStatus[] = ["Новая", "На рассмотрении", "В работе", "Закрыта"];
 const supportLevels = ["L1", "L2", "L3"];
 const ideaStatuses: IdeaStatus[] = ["Новая", "На рассмотрении", "В работе", "Закрыта"];
@@ -79,6 +92,7 @@ const initialTickets: Ticket[] = [
     time: "07:30",
     employee: "Андрей Сарафонов",
     telegram: "@sarafonov_a",
+    telegramUserId: "",
     city: "Новосибирск",
     department: "Офис",
     system: "1С",
@@ -97,6 +111,7 @@ const initialTickets: Ticket[] = [
     time: "09:10",
     employee: "Виталина Петрова",
     telegram: "@vitalina_p",
+    telegramUserId: "",
     city: "Новосибирск",
     department: "Кадровые службы",
     system: "ПК",
@@ -115,6 +130,7 @@ const initialTickets: Ticket[] = [
     time: "11:42",
     employee: "Мария Лаврова",
     telegram: "@maria_l",
+    telegramUserId: "",
     city: "Москва",
     department: "Финансы",
     system: "Битрикс24",
@@ -133,6 +149,7 @@ const initialTickets: Ticket[] = [
     time: "16:25",
     employee: "Игорь Власов",
     telegram: "@vlasov_i",
+    telegramUserId: "",
     city: "Томск",
     department: "Логистика",
     system: "WMS",
@@ -151,6 +168,7 @@ const initialTickets: Ticket[] = [
     time: "13:05",
     employee: "Сергей Орлов",
     telegram: "@orlov_s",
+    telegramUserId: "",
     city: "Новосибирск",
     department: "Продажи",
     system: "VPN",
@@ -169,6 +187,7 @@ const initialTickets: Ticket[] = [
     time: "10:20",
     employee: "Ольга Белова",
     telegram: "@belova_o",
+    telegramUserId: "",
     city: "Москва",
     department: "Маркетинг",
     system: "Почта",
@@ -1859,6 +1878,7 @@ function CreateTicketPanel({
       time: new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
       employee: form.employee,
       telegram: "—",
+      telegramUserId: "",
       city: form.city,
       department: form.department,
       system: form.system,
@@ -2004,6 +2024,63 @@ function TicketPanel({
   notify: (message: string) => void;
 }) {
   const [draft, setDraft] = useState(ticket);
+  const [messages, setMessages] = useState<ApiTicketMessage[]>([]);
+  const [chatText, setChatText] = useState("");
+  const [chatLoading, setChatLoading] = useState(true);
+  const [chatSending, setChatSending] = useState(false);
+  const [chatError, setChatError] = useState("");
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    const refreshMessages = async () => {
+      try {
+        const result = await helpdeskApi.ticketMessages(ticket.id);
+        if (active) {
+          setMessages((current) => current.length === result.length
+            && current.every((message, index) => message.id === result[index].id && message.telegram_status === result[index].telegram_status)
+            ? current
+            : result);
+          setChatError("");
+        }
+      } catch (error) {
+        if (active) setChatError(error instanceof Error ? error.message : "Не удалось загрузить переписку.");
+      } finally {
+        if (active) setChatLoading(false);
+      }
+    };
+    void refreshMessages();
+    const interval = window.setInterval(() => void refreshMessages(), 4000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [ticket.id]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  async function sendChatMessage(event: FormEvent) {
+    event.preventDefault();
+    const message = chatText.trim();
+    if (!message || chatSending) return;
+    setChatSending(true);
+    setChatError("");
+    try {
+      const result = await helpdeskApi.sendTicketMessage(ticket.id, message);
+      setMessages((current) => [...current.filter((item) => item.id !== result.message.id), result.message]);
+      setChatText("");
+      if (!result.delivered) notify(result.message.telegram_status === "not_configured"
+        ? "Сообщение сохранено. Добавьте BOT_TOKEN в Worker helpdesk-api, чтобы отправлять сообщения в Telegram."
+        : "Сообщение сохранено, но не доставлено в Telegram. Проверьте Telegram ID заявки.");
+    } catch (error) {
+      setChatError(error instanceof Error ? error.message : "Не удалось отправить сообщение.");
+    } finally {
+      setChatSending(false);
+    }
+  }
+
   const set = (key: keyof Ticket, value: string) => setDraft((current) => {
     if (key === "level") {
       return { ...current, level: value, assignee: ticketAssigneeForLevel(value) ?? current.assignee };
@@ -2171,6 +2248,45 @@ function TicketPanel({
               textarea
               onChange={(value) => set("comment", value)}
             />
+          </section>
+          <section className="form-section ticket-chat-section">
+            <div className="section-heading">
+              <span>04</span>
+              <div>
+                <h3>Переписка с сотрудником</h3>
+                <p>Сообщения будут отправлены в Telegram сотрудника</p>
+              </div>
+            </div>
+            {!ticket.telegramUserId && (
+              <p className="ticket-chat-empty">Для этой заявки нет Telegram ID сотрудника, поэтому написать ему через бота нельзя.</p>
+            )}
+            <div className="ticket-chat-messages" aria-live="polite">
+              {chatLoading && <p className="ticket-chat-empty">Загружаем переписку…</p>}
+              {!chatLoading && !messages.length && <p className="ticket-chat-empty">Сообщений пока нет. Напишите сотруднику первое сообщение.</p>}
+              {messages.map((message) => (
+                <article key={message.id} className={`ticket-chat-message ${message.sender_type === "support" ? "from-support" : "from-employee"}`}>
+                  <div><strong>{message.sender_name}</strong><time>{formatTicketChatTime(message.created_at)}</time></div>
+                  <p>{message.body}</p>
+                  {message.sender_type === "support" && message.telegram_status === "failed" && <small className="ticket-chat-delivery-error">Не доставлено в Telegram</small>}
+                  {message.sender_type === "support" && message.telegram_status === "not_configured" && <small className="ticket-chat-delivery-error">Добавьте BOT_TOKEN в Worker API для доставки</small>}
+                </article>
+              ))}
+              <div ref={chatEndRef} />
+            </div>
+            {chatError && <p className="ticket-chat-error" role="alert">{chatError}</p>}
+            <form className="ticket-chat-composer" onSubmit={sendChatMessage}>
+              <textarea
+                value={chatText}
+                onChange={(event) => setChatText(event.target.value)}
+                placeholder="Напишите сообщение сотруднику…"
+                maxLength={4000}
+                rows={3}
+                disabled={!ticket.telegramUserId || chatSending}
+              />
+              <button className="button primary" type="submit" disabled={!ticket.telegramUserId || !chatText.trim() || chatSending}>
+                {chatSending ? "Отправляем…" : "Отправить"}
+              </button>
+            </form>
           </section>
         </div>
       </aside>

@@ -37,8 +37,20 @@ export type ApiTicket = {
   assignee: string | null;
   scale: string | null;
   employee_telegram_id: string | null;
+  telegram_user_id?: string | null;
   photo_count?: number;
   file_count?: number;
+};
+
+export type ApiTicketMessage = {
+  id: number;
+  ticket_id: number;
+  sender_type: "employee" | "support";
+  sender_telegram_id: string | null;
+  sender_name: string;
+  body: string;
+  telegram_status: string;
+  created_at: string;
 };
 
 export type ApiIdea = {
@@ -162,6 +174,16 @@ export const helpdeskApi = {
     });
     return result.ticket;
   },
+  async ticketMessages(id: number) {
+    const result = await request<{ messages: ApiTicketMessage[] }>(`/api/tickets/${id}/messages`);
+    return result.messages;
+  },
+  async sendTicketMessage(id: number, message: string) {
+    return request<{ message: ApiTicketMessage; delivered: boolean }>(`/api/tickets/${id}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ message }),
+    });
+  },
   async deleteTicket(id: number) {
     await request(`/api/tickets/${id}`, { method: "DELETE" });
   },
@@ -188,6 +210,7 @@ export function toUiTicket(ticket: ApiTicket) {
     time: localizedDateTime?.time ?? ticket.time?.slice(0, 5) ?? "",
     employee: ticket.employee || "Не указано",
     telegram: ticket.employee_telegram_id || "—",
+    telegramUserId: ticket.telegram_user_id || /(?:ID|идентификатор)\s*:\s*(\d+)/i.exec(ticket.employee_telegram_id || "")?.[1] || "",
     city: ticket.city || "",
     department: ticket.department || "",
     system: ticket.system || "",

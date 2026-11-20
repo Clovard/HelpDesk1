@@ -8,6 +8,7 @@ export type CreateTicketInput = {
     type?: string;
     problem: string;
     employeeTelegramId?: string;
+    telegramUserId?: string;
     scale?: string;
 };
 
@@ -98,9 +99,10 @@ input: CreateTicketInput,
         support_level,
         assignee,
         employee_telegram_id,
+        telegram_user_id,
         scale
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     )
     .bind(
@@ -117,6 +119,7 @@ input: CreateTicketInput,
     "L1",
     "Андрей",
     input.employeeTelegramId ?? null,
+    input.telegramUserId ?? null,
     input.scale ?? null,
     )
     .run();

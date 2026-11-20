@@ -7,6 +7,7 @@ import tickets from "./routes/tickets";
 import ideas from "./routes/ideas";
 import comments from "./routes/comments";
 import users from "./routes/users";
+import ticketMessages from "./routes/ticket-messages";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -33,6 +34,7 @@ app.get("/health", (context) => {
 });
 
 app.route("/api/tickets", tickets);
+app.route("/api/tickets", ticketMessages);
 app.route("/api/ideas", ideas);
 app.route("/api/tickets", comments);
 app.route("/api/users", users);
