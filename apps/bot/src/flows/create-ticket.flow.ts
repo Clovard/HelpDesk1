@@ -2,6 +2,7 @@ import { HelpdeskApiClient } from "../api-client";
 import { getChoiceKeyboard, getConfirmKeyboard, getMainKeyboard, MAIN_ACTIONS } from "../keyboards/main.keyboard";
 import { sendTelegramMessage, type TelegramMessage } from "../telegram-client";
 import { sendToSupportChat } from "../support-chat";
+import { startTicketChat } from "../handlers/my-tickets.handler";
 
 type BotEnv = { DB: D1Database; API_URL: string; BOT_TOKEN: string; SUPPORT_CHAT_ID?: string };
 type TicketSessionState = "city" | "department" | "system" | "type" | "problem" | "confirmation";
@@ -107,7 +108,7 @@ export async function handleCreateTicketFlow(env: BotEnv, message: TelegramMessa
             system: session.data.system, type: session.data.type, problem: session.data.problem!,
             employeeTelegramId: session.data.telegramId,
             telegramUserId: session.data.telegramUserId,
-        }) as { ok: boolean; publicId?: string; ticket?: { public_id?: string }; error?: string };
+        }) as { ok: boolean; publicId?: string; ticket?: { id?: number; public_id?: string }; error?: string };
         await deleteSession(env, chatId);
         if (!result.ok) {
             await sendTelegramMessage(env.BOT_TOKEN, chatId, "Не удалось создать заявку. Попробуйте ещё раз позже.", getMainKeyboard());
@@ -131,6 +132,7 @@ export async function handleCreateTicketFlow(env: BotEnv, message: TelegramMessa
         if (!supportDelivery.configured) deliveryNote = "\nУведомление в рабочую группу не отправлено: не задан её идентификатор.";
         else if (!supportDelivery.summarySent) deliveryNote = "\nНе удалось отправить копию в рабочую группу. Проверьте её идентификатор и права бота.";
         await sendTelegramMessage(env.BOT_TOKEN, chatId, `✅ Заявка создана!\nНомер: ${publicId}${deliveryNote}`, getMainKeyboard());
+        if (result.ticket?.id) await startTicketChat(env, chatId, result.ticket.id);
         return true;
     }
 

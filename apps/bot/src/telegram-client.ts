@@ -88,6 +88,21 @@ export async function answerTelegramCallback(token: string, callbackQueryId: str
     });
 }
 
+export async function editTelegramMessage(
+    token: string,
+    chatId: number | string,
+    messageId: number,
+    text: string,
+    replyMarkup?: unknown,
+) {
+    return callTelegram(token, "editMessageText", {
+        chat_id: chatId,
+        message_id: messageId,
+        text,
+        reply_markup: replyMarkup,
+    });
+}
+
 export async function sendTelegramAttachment(
     token: string,
     chatId: number | string,
