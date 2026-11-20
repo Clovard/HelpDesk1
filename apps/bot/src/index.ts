@@ -1,6 +1,7 @@
 import {
 handleStart,
 } from "./handlers/start.handler";
+import { sendHelp } from "./handlers/help.handler";
 
 import {
 handleMyTickets,
@@ -66,6 +67,16 @@ export default {
 
         if (text === "/chatid") {
             await sendTelegramMessage(env.BOT_TOKEN, chatId, `Идентификатор этого чата: ${chatId}`);
+            return new Response("OK");
+        }
+
+        if (text === MAIN_ACTIONS.help || ["/help", "help", "помощь", "как пользоваться"].includes(normalized)) {
+            const [activeSession, selectedTicket] = await Promise.all([
+                env.DB.prepare("SELECT chat_id FROM bot_sessions WHERE chat_id = ?").bind(String(chatId)).first<{ chat_id: string }>(),
+                env.DB.prepare("SELECT chat_id FROM bot_ticket_chats WHERE chat_id = ?").bind(String(chatId)).first<{ chat_id: string }>(),
+            ]);
+            const replyMarkup = activeSession || selectedTicket ? undefined : getMainKeyboard();
+            await sendHelp(env.BOT_TOKEN, chatId, replyMarkup);
             return new Response("OK");
         }
 

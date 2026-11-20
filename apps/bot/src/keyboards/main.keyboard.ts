@@ -2,6 +2,7 @@ export const MAIN_ACTIONS = {
     createTicket: "🛠 Создать заявку",
     createIdea: "💡 Предложить идею",
     myTickets: "📋 Мои заявки",
+    help: "❓ Как пользоваться",
 };
 
 export function getMainKeyboard() {
@@ -9,6 +10,7 @@ export function getMainKeyboard() {
         keyboard: [
             [{ text: MAIN_ACTIONS.createTicket }, { text: MAIN_ACTIONS.createIdea }],
             [{ text: MAIN_ACTIONS.myTickets }],
+            [{ text: MAIN_ACTIONS.help }],
         ],
         resize_keyboard: true,
         one_time_keyboard: false,
