@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { getApiUrl, helpdeskApi, normalizeTicketAssignee, saveApiUrl, ticketAssigneeForLevel, ticketLevelForAssignee, toApiStatus, toUiIdea, toUiTicket, type ApiTicketMessage } from "./api";
+import { getApiUrl, helpdeskApi, normalizeTicketAssignee, saveApiUrl, ticketAssigneeForLevel, ticketLevelForAssignee, toApiStatus, toUiIdea, toUiTicket, type ApiTicketConversation, type ApiTicketMessage } from "./api";
 
-type View = "tickets" | "ideas" | "settings";
+type View = "tickets" | "ideas" | "messages" | "settings";
 type TicketView = "list" | "kanban";
 type IdeaStatus = TicketStatus;
 type IdeaFilters = { city: string; priority: string; status: string; assignee: string };
@@ -247,6 +247,12 @@ const iconPaths: Record<string, React.ReactNode> = {
     <>
       <path d="M9 18h6M10 22h4" />
       <path d="M8.2 14.5A7 7 0 1 1 15.8 14.5C14.6 15.4 15 17 13 17h-2c-2 0-1.6-1.6-2.8-2.5Z" />
+    </>
+  ),
+  messages: (
+    <>
+      <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-7.5A7.5 7.5 0 1 1 20 11.5Z" />
+      <path d="M8 10h8M8 14h5" />
     </>
   ),
   settings: (
@@ -741,6 +747,13 @@ function App() {
             <Icon name="bulb" />
             <span>Идеи</span>
           </button>
+          <button
+            className={view === "messages" ? "nav-item active" : "nav-item"}
+            onClick={() => setView("messages")}
+          >
+            <Icon name="messages" />
+            <span>Сообщения</span>
+          </button>
         </nav>
         <div className="nav-caption lower">Система</div>
         <nav>
@@ -777,7 +790,7 @@ function App() {
 
       <main className="main">
         <header className="topbar">
-          <div className="global-search">
+          {view !== "messages" && <div className="global-search">
             <Icon name="search" size={19} />
             <input
               value={search}
@@ -785,7 +798,7 @@ function App() {
               placeholder="Найти заявку, сотрудника или систему…"
             />
             <kbd>⌘ K</kbd>
-          </div>
+          </div>}
           <div className="topbar-right">
             <span className="today">
               Сегодня, {new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" }).format(today)}
@@ -840,6 +853,7 @@ function App() {
             onExport={() => setPanel("exportIdeas")}
           />
         )}
+        {view === "messages" && <MessagesPage />}
         {view === "settings" && (
           <SettingsPage notify={notify} apiUrl={getApiUrl()} apiOnline={apiOnline} onSaveApiUrl={saveApiUrl} onRefresh={() => void refreshData(true)} />
         )}
@@ -887,6 +901,209 @@ function App() {
         </div>
       )}
     </div>
+  );
+}
+
+function MessagesPage() {
+  const [conversations, setConversations] = useState<ApiTicketConversation[]>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [messages, setMessages] = useState<ApiTicketMessage[]>([]);
+  const [search, setSearch] = useState("");
+  const [listLoading, setListLoading] = useState(true);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [listError, setListError] = useState("");
+  const [chatError, setChatError] = useState("");
+  const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = async () => {
+      try {
+        const result = await helpdeskApi.ticketConversations();
+        if (!active) return;
+        setConversations(result);
+        setSelectedId((current) => current && result.some((conversation) => conversation.id === current)
+          ? current
+          : result[0]?.id ?? null);
+        setListError("");
+      } catch (error) {
+        if (active) setListError(error instanceof Error ? error.message : "Не удалось загрузить диалоги.");
+      } finally {
+        if (active) setListLoading(false);
+      }
+    };
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), 10_000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (selectedId === null) {
+      setMessages([]);
+      return;
+    }
+    let active = true;
+    setMessages([]);
+    setChatLoading(true);
+    const refresh = async () => {
+      try {
+        const result = await helpdeskApi.ticketMessages(selectedId);
+        if (active) {
+          setMessages((current) => current.length === result.length
+            && current.every((message, index) => message.id === result[index].id && message.telegram_status === result[index].telegram_status)
+            ? current
+            : result);
+          setChatError("");
+        }
+      } catch (error) {
+        if (active) setChatError(error instanceof Error ? error.message : "Не удалось загрузить переписку.");
+      } finally {
+        if (active) setChatLoading(false);
+      }
+    };
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), 4_000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [selectedId]);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const selected = conversations.find((conversation) => conversation.id === selectedId) ?? null;
+  const visibleConversations = conversations.filter((conversation) => {
+    const query = search.trim().toLocaleLowerCase("ru");
+    return !query || [conversation.public_id, conversation.employee, conversation.employee_telegram_id, conversation.problem, conversation.last_message]
+      .filter(Boolean).join(" ").toLocaleLowerCase("ru").includes(query);
+  });
+  const telegramHandle = selected?.employee_telegram_id?.match(/@[\p{L}\p{N}_]+/u)?.[0];
+  const hasTelegramId = Boolean(selected?.telegram_user_id || /(?:ID|идентификатор)\s*:\s*\d+/i.test(selected?.employee_telegram_id ?? ""));
+
+  async function sendMessage(event: FormEvent) {
+    event.preventDefault();
+    const text = draft.trim();
+    if (!selected || !text || sending) return;
+    setSending(true);
+    setChatError("");
+    try {
+      const result = await helpdeskApi.sendTicketMessage(selected.id, text);
+      setMessages((current) => [...current.filter((message) => message.id !== result.message.id), result.message]);
+      setConversations((current) => current.map((conversation) => conversation.id === selected.id
+        ? { ...conversation, last_message: result.message.body, last_sender_type: "support" as const, last_message_at: result.message.created_at }
+        : conversation));
+      setDraft("");
+    } catch (error) {
+      setChatError(error instanceof Error ? error.message : "Не удалось отправить сообщение.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  const displayStatus: Record<string, string> = {
+    New: "Новая",
+    "Under Review": "На рассмотрении",
+    "In Progress": "В работе",
+    Closed: "Закрыта",
+  };
+
+  return (
+    <section className="messenger-page">
+      <div className="page-heading messenger-heading">
+        <div>
+          <div className="breadcrumb">Рабочее пространство <Icon name="chevron" size={13} /> Сообщения</div>
+          <h1>Сообщения</h1>
+          <p>Переписка с сотрудниками по их заявкам</p>
+        </div>
+      </div>
+      <div className="messenger-shell">
+        <aside className="messenger-sidebar">
+          <div className="messenger-list-heading">
+            <strong>Диалоги</strong>
+            <span>{conversations.length}</span>
+          </div>
+          <label className="messenger-search">
+            <Icon name="search" size={16} />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск по заявке или сотруднику" />
+          </label>
+          {listError && <p className="messenger-error" role="alert">{listError}</p>}
+          <div className="messenger-conversation-list">
+            {listLoading && <p className="messenger-empty">Загружаем диалоги…</p>}
+            {!listLoading && !listError && !visibleConversations.length && (
+              <p className="messenger-empty">{conversations.length ? "Ничего не найдено." : "Пока нет заявок с Telegram для переписки."}</p>
+            )}
+            {visibleConversations.map((conversation) => {
+              const handle = conversation.employee_telegram_id?.match(/@[\p{L}\p{N}_]+/u)?.[0];
+              return (
+                <button
+                  type="button"
+                  key={conversation.id}
+                  className={`messenger-conversation ${conversation.id === selectedId ? "selected" : ""}`}
+                  onClick={() => setSelectedId(conversation.id)}
+                >
+                  <span className="messenger-avatar"><Icon name="tickets" size={16} /></span>
+                  <span className="messenger-conversation-copy">
+                    <span className="messenger-conversation-top"><strong>{conversation.public_id}</strong><time>{formatTicketChatTime(conversation.last_message_at)}</time></span>
+                    <span className="messenger-handle">{handle || "Telegram"} · {conversation.employee}</span>
+                    <span className="messenger-description">{conversation.problem}</span>
+                    <span className="messenger-preview">{conversation.last_sender_type ? `${conversation.last_sender_type === "support" ? "Вы: " : ""}${conversation.last_message}` : "Переписка ещё не началась"}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+
+        <section className="messenger-thread">
+          {selected ? (
+            <>
+              <header className="messenger-thread-header">
+                <span className="messenger-avatar large"><Icon name="tickets" size={18} /></span>
+                <div>
+                  <strong>{selected.public_id}</strong>
+                  <small>{selected.employee} · {telegramHandle || "Telegram"} · {displayStatus[selected.status] || selected.status}</small>
+                  <p>{selected.problem}</p>
+                </div>
+              </header>
+              <div className="messenger-thread-messages ticket-chat-messages" aria-live="polite">
+                {chatLoading && <p className="ticket-chat-empty">Загружаем переписку…</p>}
+                {!chatLoading && !messages.length && <p className="ticket-chat-empty">Сообщений пока нет. Напишите сотруднику первое сообщение.</p>}
+                {messages.map((message) => (
+                  <article key={message.id} className={`ticket-chat-message ${message.sender_type === "support" ? "from-support" : "from-employee"}`}>
+                    <div><strong>{message.sender_name}</strong><time>{formatTicketChatTime(message.created_at)}</time></div>
+                    <p>{message.body}</p>
+                    {message.sender_type === "support" && message.telegram_status === "failed" && <small className="ticket-chat-delivery-error">Не доставлено в Telegram</small>}
+                    {message.sender_type === "support" && message.telegram_status === "not_configured" && <small className="ticket-chat-delivery-error">API не настроен для отправки в Telegram</small>}
+                  </article>
+                ))}
+                <div ref={endRef} />
+              </div>
+              {chatError && <p className="messenger-error" role="alert">{chatError}</p>}
+              {!hasTelegramId && <p className="messenger-warning">У этой заявки не сохранён Telegram ID, поэтому ответить сотруднику нельзя.</p>}
+              <form className="messenger-composer" onSubmit={sendMessage}>
+                <textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Напишите сообщение…" rows={2} maxLength={4000} disabled={!hasTelegramId || sending} />
+                <button className="button primary" type="submit" disabled={!hasTelegramId || !draft.trim() || sending}>
+                  {sending ? "Отправляем…" : "Отправить"}
+                </button>
+              </form>
+            </>
+          ) : (
+            <div className="messenger-placeholder">
+              <Icon name="messages" size={30} />
+              <strong>Выберите диалог</strong>
+              <span>Заявка и переписка с сотрудником появятся здесь.</span>
+            </div>
+          )}
+        </section>
+      </div>
+    </section>
   );
 }
 

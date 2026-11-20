@@ -1,8 +1,13 @@
 import { Hono } from "hono";
 import type { Env } from "../db/client";
-import { listTicketMessages, sendSupportTicketMessage } from "../services/ticket-message.service";
+import { listTicketConversations, listTicketMessages, sendSupportTicketMessage } from "../services/ticket-message.service";
 
 const ticketMessages = new Hono<{ Bindings: Env }>();
+
+ticketMessages.get("/conversations", async (context) => {
+    const conversations = await listTicketConversations(context.env);
+    return context.json({ ok: true, conversations });
+});
 
 ticketMessages.get("/:id/messages", async (context) => {
     const ticketId = Number(context.req.param("id"));

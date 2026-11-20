@@ -53,6 +53,19 @@ export type ApiTicketMessage = {
   created_at: string;
 };
 
+export type ApiTicketConversation = {
+  id: number;
+  public_id: string;
+  employee: string;
+  employee_telegram_id: string | null;
+  telegram_user_id: string | null;
+  problem: string;
+  status: string;
+  last_message: string;
+  last_sender_type: "employee" | "support" | null;
+  last_message_at: string;
+};
+
 export type ApiIdea = {
   id: number;
   public_id: string;
@@ -177,6 +190,10 @@ export const helpdeskApi = {
   async ticketMessages(id: number) {
     const result = await request<{ messages: ApiTicketMessage[] }>(`/api/tickets/${id}/messages`);
     return result.messages;
+  },
+  async ticketConversations() {
+    const result = await request<{ conversations: ApiTicketConversation[] }>("/api/tickets/conversations");
+    return result.conversations;
   },
   async sendTicketMessage(id: number, message: string) {
     return request<{ message: ApiTicketMessage; delivered: boolean }>(`/api/tickets/${id}/messages`, {

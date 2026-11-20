@@ -33,8 +33,8 @@ app.get("/health", (context) => {
     });
 });
 
-app.route("/api/tickets", tickets);
 app.route("/api/tickets", ticketMessages);
+app.route("/api/tickets", tickets);
 app.route("/api/ideas", ideas);
 app.route("/api/tickets", comments);
 app.route("/api/users", users);

@@ -11,6 +11,40 @@ export type TicketMessage = {
     created_at: string;
 };
 
+export type TicketConversation = {
+    id: number;
+    public_id: string;
+    employee: string;
+    employee_telegram_id: string | null;
+    telegram_user_id: string | null;
+    problem: string;
+    status: string;
+    last_message: string;
+    last_sender_type: "employee" | "support" | null;
+    last_message_at: string;
+};
+
+export async function listTicketConversations(env: Env) {
+    const result = await env.DB.prepare(`
+        SELECT
+            t.id,
+            t.public_id,
+            t.employee,
+            t.employee_telegram_id,
+            t.telegram_user_id,
+            t.problem,
+            t.status,
+            COALESCE((SELECT m.body FROM ticket_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC, m.id DESC LIMIT 1), '') AS last_message,
+            (SELECT m.sender_type FROM ticket_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_sender_type,
+            COALESCE((SELECT m.created_at FROM ticket_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC, m.id DESC LIMIT 1), t.created_at) AS last_message_at
+        FROM tickets t
+        WHERE t.telegram_user_id IS NOT NULL
+           OR (t.employee_telegram_id IS NOT NULL AND t.employee_telegram_id <> '')
+        ORDER BY last_message_at DESC, t.id DESC
+    `).all<TicketConversation>();
+    return result.results;
+}
+
 export async function listTicketMessages(env: Env, ticketId: number) {
     const result = await env.DB.prepare(`
         SELECT id, ticket_id, sender_type, sender_telegram_id, sender_name, body, telegram_status, created_at
