@@ -54,8 +54,8 @@ function prompt(state: IdeaSessionState) {
 }
 
 function keyboard(state: IdeaSessionState) {
-    if (state === "city") return getChoiceKeyboard(["Новосибирск", "Красноярск", "Томск", "Кемерово", "Братск", "Другой город"]);
-    if (state === "department") return getChoiceKeyboard(["Офис", "Склад", "Логистика", "Бухгалтерия", "Закупки", "Другое"]);
+    if (state === "city") return getChoiceKeyboard(["Новосибирск", "Красноярск", "Томск", "Кемерово", "Барнаул"]);
+    if (state === "department") return getChoiceKeyboard(["Офис", "Склад", "Логистика", "Закупки", "Другое"]);
     if (state === "priority") return getChoiceKeyboard(["Низкий", "Средний", "Высокий"]);
     if (state === "attachments") return getAttachmentsKeyboard();
     if (state === "confirmation") return getConfirmKeyboard();
@@ -190,11 +190,11 @@ export async function handleCreateIdeaFlow(env: BotEnv, message: TelegramMessage
         await deleteSession(env, chatId);
         return false;
     }
-    if (session.state === "city" && !["Новосибирск", "Красноярск", "Томск", "Кемерово", "Братск", "Другой город"].includes(text)) {
+    if (session.state === "city" && !["Новосибирск", "Красноярск", "Томск", "Кемерово", "Барнаул"].includes(text)) {
         await sendTelegramMessage(env.BOT_TOKEN, chatId, "Выберите город кнопкой ниже.", keyboard("city"));
         return true;
     }
-    if (session.state === "department" && !["Офис", "Склад", "Логистика", "Бухгалтерия", "Закупки", "Другое"].includes(text)) {
+    if (session.state === "department" && !["Офис", "Склад", "Логистика", "Закупки", "Другое"].includes(text)) {
         await sendTelegramMessage(env.BOT_TOKEN, chatId, "Выберите подразделение кнопкой ниже.", keyboard("department"));
         return true;
     }

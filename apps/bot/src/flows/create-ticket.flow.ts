@@ -8,8 +8,8 @@ type TicketSessionState = "city" | "department" | "system" | "type" | "problem" 
 type TicketSessionData = { employee?: string; telegramId?: string; city?: string; department?: string; system?: string; type?: string; problem?: string; attachments?: TelegramAttachment[] };
 type TicketSession = { state: TicketSessionState; data: TicketSessionData };
 
-const cities = ["Новосибирск", "Красноярск", "Томск", "Кемерово", "Братск", "Другой город"];
-const departments = ["Офис", "Склад", "Логистика", "Бухгалтерия", "Закупки", "Другое"];
+const cities = ["Новосибирск", "Красноярск", "Томск", "Кемерово", "Барнаул"];
+const departments = ["Офис", "Склад", "Логистика", "Закупки", "Другое"];
 const types = ["Не работает", "Ошибка", "Доступ", "Настройка", "Оборудование", "Другое"];
 
 async function getSession(env: BotEnv, chatId: number): Promise<TicketSession | null> {
