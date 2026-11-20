@@ -13,6 +13,19 @@ export type CreateIdeaInput = {
     fileCount?: number;
 };
 
+export type UpdateIdeaInput = {
+    employee?: string;
+    city?: string | null;
+    department?: string | null;
+    system?: string | null;
+    idea?: string;
+    expectedResult?: string | null;
+    priority?: "Low" | "Medium" | "High";
+    status?: string;
+    assignee?: string | null;
+    comment?: string | null;
+};
+
 export async function listIdeas(env: Env) {
     const result = await env.DB.prepare(
     `
@@ -95,4 +108,38 @@ input: CreateIdeaInput,
         id: result.meta.last_row_id,
         publicId,
     };
+}
+
+export async function updateIdea(env: Env, id: number, input: UpdateIdeaInput) {
+    const current = await getIdeaById(env, id) as {
+        employee: string; city: string | null; department: string | null; system: string | null;
+        idea: string; expected_result: string | null; priority: string; status: string;
+        assignee: string | null; comment: string | null;
+    } | null;
+    if (!current) return null;
+
+    await env.DB.prepare(`UPDATE ideas SET
+        employee = ?, city = ?, department = ?, system = ?, idea = ?, expected_result = ?,
+        priority = ?, status = ?, assignee = ?, comment = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?`)
+        .bind(
+            input.employee ?? current.employee,
+            input.city === undefined ? current.city : input.city,
+            input.department === undefined ? current.department : input.department,
+            input.system === undefined ? current.system : input.system,
+            input.idea ?? current.idea,
+            input.expectedResult === undefined ? current.expected_result : input.expectedResult,
+            input.priority ?? current.priority,
+            input.status ?? current.status,
+            input.assignee === undefined ? current.assignee : input.assignee,
+            input.comment === undefined ? current.comment : input.comment,
+            id,
+        ).run();
+
+    return getIdeaById(env, id);
+}
+
+export async function deleteIdea(env: Env, id: number) {
+    const result = await env.DB.prepare("DELETE FROM ideas WHERE id = ?").bind(id).run();
+    return result.meta.changes > 0;
 }

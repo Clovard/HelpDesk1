@@ -3,6 +3,8 @@ import { getApiUrl, helpdeskApi, saveApiUrl, toApiStatus, toUiIdea, toUiTicket }
 
 type View = "tickets" | "ideas" | "settings";
 type TicketView = "list" | "kanban";
+type IdeaStatus = TicketStatus;
+type IdeaFilters = { city: string; priority: string; status: string; assignee: string };
 type ExportKind = "tickets" | "ideas";
 type TicketStatus = "Новая" | "На рассмотрении" | "В работе" | "Закрыта";
 type TicketFilters = {
@@ -36,6 +38,7 @@ type Ticket = {
 
 type Idea = {
   id: string;
+  rowId: number;
   date: string;
   time: string;
   employee: string;
@@ -45,7 +48,7 @@ type Idea = {
   idea: string;
   expected: string;
   priority: string;
-  status: string;
+  status: IdeaStatus;
   assignee: string;
   comment: string;
   photoCount?: number;
@@ -61,6 +64,7 @@ function attachmentSummary(photoCount = 0, fileCount = 0) {
 
 const statuses: TicketStatus[] = ["Новая", "На рассмотрении", "В работе", "Закрыта"];
 const supportLevels = ["L1", "L2", "L3"];
+const ideaStatuses: IdeaStatus[] = ["Новая", "На рассмотрении", "В работе", "Закрыта"];
 const statusMeta: Record<TicketStatus, { tone: string; dot: string }> = {
   Новая: { tone: "status-new", dot: "#7057D9" },
   "На рассмотрении": { tone: "status-review", dot: "#B7791F" },
@@ -188,6 +192,7 @@ const initialTickets: Ticket[] = [
 const initialIdeas: Idea[] = [
   {
     id: "IDEA-38A7",
+    rowId: -1,
     date: "05.11.2026",
     time: "14:18",
     employee: "Елена Соколова",
@@ -197,12 +202,13 @@ const initialIdeas: Idea[] = [
     idea: "Добавить быстрые шаблоны ответов клиентам",
     expected: "Сократить время обработки типовых обращений",
     priority: "Средний",
-    status: "На оценке",
+    status: "На рассмотрении",
     assignee: "Тёма",
     comment: "Запланировано интервью с отделом",
   },
   {
     id: "IDEA-12C4",
+    rowId: -2,
     date: "02.11.2026",
     time: "10:05",
     employee: "Павел Минаев",
@@ -212,7 +218,7 @@ const initialIdeas: Idea[] = [
     idea: "Уведомлять о критическом остатке в Telegram",
     expected: "Быстрее реагировать на дефицит товара",
     priority: "Высокий",
-    status: "Принята",
+    status: "В работе",
     assignee: "Андрей",
     comment: "Включено в план развития",
   },
@@ -375,6 +381,7 @@ function downloadCsv(filename: string, headers: string[], rows: string[][]) {
 function App() {
   const [view, setView] = useState<View>("tickets");
   const [ticketView, setTicketView] = useState<TicketView>("list");
+  const [ideaView, setIdeaView] = useState<TicketView>("list");
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [apiOnline, setApiOnline] = useState(false);
@@ -389,10 +396,14 @@ function App() {
     status: "",
   });
   const [ideasSearch, setIdeasSearch] = useState("");
+  const [ideaFilters, setIdeaFilters] = useState<IdeaFilters>({ city: "", priority: "", status: "", assignee: "" });
   const [selected, setSelected] = useState<Ticket | null>(null);
-  const [panel, setPanel] = useState<"details" | "create" | "createIdea" | "exportTickets" | "exportIdeas" | null>(null);
+  const [selectedIdea, setSelectedIdea] = useState<Idea | null>(null);
+  const [panel, setPanel] = useState<"details" | "create" | "createIdea" | "ideaDetails" | "exportTickets" | "exportIdeas" | null>(null);
   const [editing, setEditing] = useState(false);
   const [draggedId, setDraggedId] = useState<number | null>(null);
+  const [editingIdea, setEditingIdea] = useState(false);
+  const [draggedIdeaId, setDraggedIdeaId] = useState<number | null>(null);
   const [toast, setToast] = useState("");
 
   async function refreshData(showMessage = false, showLoading = true) {
@@ -497,7 +508,7 @@ function App() {
     }
   }
 
-  async function createIdea(idea: Omit<Idea, "id" | "date" | "time" | "status" | "assignee" | "comment">) {
+  async function createIdea(idea: Omit<Idea, "id" | "rowId" | "date" | "time" | "status" | "assignee" | "comment" | "photoCount" | "fileCount">) {
     try {
       await helpdeskApi.createIdea({
         employee: idea.employee,
@@ -515,6 +526,62 @@ function App() {
     } catch (error) {
       notify(error instanceof Error ? error.message : "Не удалось создать идею");
       throw error;
+    }
+  }
+
+  function openIdea(idea: Idea) {
+    setSelectedIdea(idea);
+    setEditingIdea(false);
+    setPanel("ideaDetails");
+  }
+
+  async function updateIdea(updated: Idea) {
+    try {
+      const saved = await helpdeskApi.updateIdea(updated.rowId, {
+        employee: updated.employee,
+        city: updated.city,
+        department: updated.department,
+        system: updated.system,
+        idea: updated.idea,
+        expectedResult: updated.expected,
+        priority: ({ Низкий: "Low", Средний: "Medium", Высокий: "High" } as Record<string, string>)[updated.priority] ?? "Medium",
+        status: toApiStatus(updated.status),
+        assignee: updated.assignee,
+        comment: updated.comment,
+      });
+      const mapped = toUiIdea(saved);
+      setIdeas((current) => current.map((item) => item.rowId === mapped.rowId ? mapped : item));
+      setSelectedIdea(mapped);
+      notify("Изменения идеи сохранены");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Не удалось сохранить идею");
+      throw error;
+    }
+  }
+
+  async function deleteIdea(id: number) {
+    try {
+      await helpdeskApi.deleteIdea(id);
+      setIdeas((current) => current.filter((idea) => idea.rowId !== id));
+      setSelectedIdea(null);
+      setPanel(null);
+      notify("Идея удалена");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Не удалось удалить идею");
+    }
+  }
+
+  async function moveIdea(status: IdeaStatus) {
+    if (draggedIdeaId === null) return;
+    const idea = ideas.find((item) => item.rowId === draggedIdeaId);
+    setDraggedIdeaId(null);
+    if (!idea || idea.status === status) return;
+    try {
+      const saved = await helpdeskApi.updateIdea(idea.rowId, { status: toApiStatus(status) });
+      const mapped = toUiIdea(saved);
+      setIdeas((current) => current.map((item) => item.rowId === mapped.rowId ? mapped : item));
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Не удалось изменить статус идеи");
     }
   }
 
@@ -754,7 +821,14 @@ function App() {
             ideas={ideas}
             search={ideasSearch}
             setSearch={setIdeasSearch}
+            filters={ideaFilters}
+            setFilters={setIdeaFilters}
+            ideaView={ideaView}
+            setIdeaView={setIdeaView}
             onCreate={() => setPanel("createIdea")}
+            onOpen={openIdea}
+            onDragStart={setDraggedIdeaId}
+            onDrop={moveIdea}
             onExport={() => setPanel("exportIdeas")}
           />
         )}
@@ -783,6 +857,10 @@ function App() {
           onDelete={deleteTicket}
           notify={notify}
         />
+      )}
+      {panel === "ideaDetails" && selectedIdea && (
+        <IdeaPanel idea={selectedIdea} editing={editingIdea} setEditing={setEditingIdea}
+          onClose={() => setPanel(null)} onSave={updateIdea} onDelete={deleteIdea} />
       )}
       {activeExportKind && (
         <ExportPeriodPanel
@@ -1228,25 +1306,37 @@ function IdeasPage({
   ideas,
   search,
   setSearch,
+  filters,
+  setFilters,
+  ideaView,
+  setIdeaView,
   onCreate,
+  onOpen,
+  onDragStart,
+  onDrop,
   onExport,
 }: {
   ideas: Idea[];
   search: string;
   setSearch: (value: string) => void;
+  filters: IdeaFilters;
+  setFilters: (value: IdeaFilters) => void;
+  ideaView: TicketView;
+  setIdeaView: (view: TicketView) => void;
   onCreate: () => void;
+  onOpen: (idea: Idea) => void;
+  onDragStart: (id: number) => void;
+  onDrop: (status: IdeaStatus) => void;
   onExport: () => void;
 }) {
-  const [city, setCity] = useState("");
-  const [priority, setPriority] = useState("");
-  const [status, setStatus] = useState("");
   const filtered = ideas.filter((idea) =>
     Object.values(idea).join(" ").toLowerCase().includes(search.toLowerCase()) &&
-    (!city || idea.city === city) && (!priority || idea.priority === priority) && (!status || idea.status === status),
+    (!filters.city || idea.city === filters.city) && (!filters.priority || idea.priority === filters.priority) &&
+    (!filters.status || idea.status === filters.status) && (!filters.assignee || idea.assignee === filters.assignee),
   );
   const ideaCities = [...new Set(ideas.map((idea) => idea.city).filter(Boolean))].sort();
-  const ideaPriorities = [...new Set(ideas.map((idea) => idea.priority).filter(Boolean))].sort();
-  const ideaStatuses = [...new Set(ideas.map((idea) => idea.status).filter(Boolean))].sort();
+  const ideaAssignees = [...new Set(ideas.map((idea) => idea.assignee).filter(Boolean))].sort();
+  const activeFilters = Object.values(filters).filter(Boolean).length;
   return (
     <div className="page">
       <div className="page-heading">
@@ -1262,6 +1352,7 @@ function IdeasPage({
             <Icon name="download" size={16} />
             Выгрузить
           </button>
+          <button className="button primary" onClick={onCreate}><Icon name="plus" size={16} />Добавить идею</button>
         </div>
       </div>
       <section className="content-card ideas-card">
@@ -1269,6 +1360,10 @@ function IdeasPage({
           <div>
             <h2>Предложения</h2>
             <span className="count-badge">{filtered.length}</span>
+          </div>
+          <div className="view-switch">
+            <button className={ideaView === "list" ? "active" : ""} onClick={() => setIdeaView("list")}><Icon name="list" size={16} />Список</button>
+            <button className={ideaView === "kanban" ? "active" : ""} onClick={() => setIdeaView("kanban")}><Icon name="board" size={16} />Канбан</button>
           </div>
           <label className="local-search">
             <Icon name="search" size={17} />
@@ -1278,16 +1373,35 @@ function IdeasPage({
               placeholder="Поиск по идеям…"
             />
           </label>
-          <button className="button primary" onClick={onCreate}><Icon name="plus" size={16} />Добавить идею</button>
         </div>
         <div className="filter-bar">
-          <div className="filter-label"><Icon name="filter" size={16} />Фильтры</div>
-          <FilterSelect label="Город" value={city} options={ideaCities} onChange={setCity} />
-          <FilterSelect label="Приоритет" value={priority} options={ideaPriorities} onChange={setPriority} />
-          <FilterSelect label="Статус" value={status} options={ideaStatuses} onChange={setStatus} />
-          {(city || priority || status) && <button className="clear-filters" onClick={() => { setCity(""); setPriority(""); setStatus(""); }}>Сбросить <Icon name="close" size={13} /></button>}
+          <div className="filter-label"><Icon name="filter" size={16} />Фильтры{activeFilters > 0 && <span>{activeFilters}</span>}</div>
+          <FilterSelect label="Город" value={filters.city} options={ideaCities} onChange={(city) => setFilters({ ...filters, city })} />
+          <FilterSelect label="Приоритет" value={filters.priority} options={["Низкий", "Средний", "Высокий"]} onChange={(priority) => setFilters({ ...filters, priority })} />
+          <FilterSelect label="Ответственный" value={filters.assignee} options={ideaAssignees} onChange={(assignee) => setFilters({ ...filters, assignee })} />
+          <FilterSelect label="Статус" value={filters.status} options={ideaStatuses} onChange={(status) => setFilters({ ...filters, status })} />
+          {activeFilters > 0 && <button className="clear-filters" onClick={() => setFilters({ city: "", priority: "", status: "", assignee: "" })}>Сбросить <Icon name="close" size={13} /></button>}
         </div>
-        {filtered.length ? (
+        {ideaView === "kanban" ? (
+          <div className="kanban idea-kanban">
+            {ideaStatuses.map((status) => {
+              const columnIdeas = filtered.filter((idea) => idea.status === status);
+              return <section className="kanban-column" key={status} onDragOver={(event) => event.preventDefault()} onDrop={() => onDrop(status)}>
+                <header><span><i style={{ background: statusMeta[status].dot }} />{status}</span><em>{columnIdeas.length}</em></header>
+                <div className="kanban-stack">
+                  {columnIdeas.map((idea) => <article className="kanban-card" key={idea.rowId} draggable onDragStart={() => onDragStart(idea.rowId)} onClick={() => onOpen(idea)}>
+                    <div className="kanban-top"><strong>{idea.id}</strong><span className={`priority ${idea.priority === "Высокий" ? "high" : ""}`}>{idea.priority}</span></div>
+                    <h3>{idea.idea}</h3>
+                    <div className="kanban-tags"><span>{idea.system || "Без системы"}</span><span>{idea.city || "Город не указан"}</span></div>
+                    <div className="kanban-person"><span className="mini-avatar">{idea.employee.slice(0, 1)}</span><span><strong>{idea.employee}</strong><small>{idea.assignee || "Не назначен"}</small></span></div>
+                    <footer><span>{idea.date}</span><span>{attachmentSummary(idea.photoCount, idea.fileCount)}</span></footer>
+                  </article>)}
+                  {!columnIdeas.length && <div className="kanban-empty">Перетащите идею сюда</div>}
+                </div>
+              </section>;
+            })}
+          </div>
+        ) : filtered.length ? (
           <div className="table-wrap">
             <table>
               <thead>
@@ -1309,7 +1423,7 @@ function IdeasPage({
               </thead>
               <tbody>
                 {filtered.map((idea) => (
-                  <tr key={idea.id}>
+                  <tr key={idea.rowId} onClick={() => onOpen(idea)} className="clickable-row">
                     <td>
                       <strong className="ticket-id">{idea.id}</strong>
                     </td>
@@ -1333,7 +1447,7 @@ function IdeasPage({
                       </span>
                     </td>
                     <td>
-                      <span className="idea-status">{idea.status}</span>
+                      <StatusBadge status={idea.status} />
                     </td>
                     <td>{idea.assignee}</td>
                     <td className="muted-cell">{idea.comment}</td>
@@ -1356,7 +1470,7 @@ function CreateIdeaPanel({
   onCreate,
 }: {
   onClose: () => void;
-  onCreate: (idea: Omit<Idea, "id" | "date" | "time" | "status" | "assignee" | "comment">) => void | Promise<void>;
+  onCreate: (idea: Omit<Idea, "id" | "rowId" | "date" | "time" | "status" | "assignee" | "comment" | "photoCount" | "fileCount">) => void | Promise<void>;
 }) {
   const [form, setForm] = useState({ employee: "", city: "", department: "", system: "", idea: "", expected: "", priority: "Средний" });
   const set = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
@@ -1395,6 +1509,80 @@ function CreateIdeaPanel({
           </div>
           <footer className="panel-footer"><span><b>*</b> Обязательные поля</span><div><button type="button" className="button secondary" onClick={onClose}>Отмена</button><button className="button primary" type="submit">Сохранить идею</button></div></footer>
         </form>
+      </aside>
+    </div>
+  );
+}
+
+function IdeaPanel({
+  idea,
+  editing,
+  setEditing,
+  onClose,
+  onSave,
+  onDelete,
+}: {
+  idea: Idea;
+  editing: boolean;
+  setEditing: (value: boolean) => void;
+  onClose: () => void;
+  onSave: (idea: Idea) => void | Promise<void>;
+  onDelete: (id: number) => void;
+}) {
+  const [draft, setDraft] = useState(idea);
+  const set = (key: keyof Idea, value: string) => setDraft((current) => ({ ...current, [key]: value }));
+  async function save() {
+    try {
+      await onSave(draft);
+      setEditing(false);
+    } catch {
+      // Keep the form open so the user can retry.
+    }
+  }
+  return (
+    <div className="panel-backdrop" onMouseDown={onClose}>
+      <aside className="side-panel" onMouseDown={(event) => event.stopPropagation()}>
+        <header className="panel-header details-title">
+          <div>
+            <span className="eyebrow">Подробности идеи</span>
+            <h2>{idea.id}</h2>
+            <div className="details-meta"><StatusBadge status={draft.status} /><span>Создана {idea.date} в {idea.time}</span></div>
+          </div>
+          <button className="panel-close" onClick={onClose}><Icon name="close" size={20} /></button>
+        </header>
+        <div className="details-actions">
+          {!editing ? <button className="button primary" onClick={() => setEditing(true)}><Icon name="edit" size={16} />Редактировать</button> : <>
+            <button className="button primary" onClick={() => void save()}>Сохранить</button>
+            <button className="button secondary" onClick={() => { setDraft(idea); setEditing(false); }}>Отмена</button>
+          </>}
+          <button className="button danger" onClick={() => { if (window.confirm(`Удалить идею ${idea.id}?`)) onDelete(idea.rowId); }}><Icon name="trash" size={16} />Удалить</button>
+        </div>
+        <div className="panel-content details-content">
+          <section className="form-section">
+            <div className="section-heading"><span>01</span><div><h3>Данные предложения</h3><p>Автор и контекст идеи</p></div></div>
+            <div className="form-grid view-grid">
+              <DetailField label="Сотрудник" value={draft.employee} editing={editing} onChange={(value) => set("employee", value)} />
+              <DetailField label="Город" value={draft.city} editing={editing} onChange={(value) => set("city", value)} />
+              <DetailField label="Подразделение" value={draft.department} editing={editing} onChange={(value) => set("department", value)} />
+              <DetailField label="Система" value={draft.system} editing={editing} onChange={(value) => set("system", value)} />
+              <DetailField label="Вложения" value={attachmentSummary(idea.photoCount, idea.fileCount)} />
+            </div>
+          </section>
+          <section className="form-section">
+            <div className="section-heading"><span>02</span><div><h3>Суть предложения</h3><p>Идея и ожидаемый эффект</p></div></div>
+            <DetailField label="Идея / предложение" value={draft.idea} editing={editing} textarea onChange={(value) => set("idea", value)} />
+            <DetailField label="Ожидаемый результат" value={draft.expected} editing={editing} textarea onChange={(value) => set("expected", value)} />
+          </section>
+          <section className="form-section">
+            <div className="section-heading"><span>03</span><div><h3>Рассмотрение IT</h3><p>Приоритет, статус и ответственный</p></div></div>
+            <div className="form-grid">
+              <SelectField label="Статус" value={draft.status} disabled={!editing} onChange={(value) => set("status", value)} options={ideaStatuses} />
+              <SelectField label="Приоритет" value={draft.priority} disabled={!editing} onChange={(value) => set("priority", value)} options={["Низкий", "Средний", "Высокий"]} />
+              <SelectField label="Ответственный" value={draft.assignee} disabled={!editing} onChange={(value) => set("assignee", value)} options={["Не назначен", "Андрей", "Тёма", "Пентагон"]} />
+            </div>
+            <DetailField label="Комментарий IT" value={draft.comment || "Комментарий пока не добавлен"} editing={editing} textarea onChange={(value) => set("comment", value)} />
+          </section>
+        </div>
       </aside>
     </div>
   );

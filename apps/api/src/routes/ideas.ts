@@ -4,8 +4,10 @@ import type { Env } from "../db/client";
 
 import {
 createIdea,
+deleteIdea,
 getIdeaById,
 listIdeas,
+updateIdea,
 } from "../services/idea.service";
 
 const ideas = new Hono<{ Bindings: Env }>();
@@ -78,6 +80,23 @@ ideas.post("/", async (context) => {
     },
     201,
     );
+});
+
+ideas.patch("/:id", async (context) => {
+    const id = Number(context.req.param("id"));
+    if (!Number.isInteger(id)) return context.json({ ok: false, error: "Invalid idea ID" }, 400);
+    const body = await context.req.json();
+    const idea = await updateIdea(context.env, id, body);
+    if (!idea) return context.json({ ok: false, error: "Idea not found" }, 404);
+    return context.json({ ok: true, idea });
+});
+
+ideas.delete("/:id", async (context) => {
+    const id = Number(context.req.param("id"));
+    if (!Number.isInteger(id)) return context.json({ ok: false, error: "Invalid idea ID" }, 400);
+    const deleted = await deleteIdea(context.env, id);
+    if (!deleted) return context.json({ ok: false, error: "Idea not found" }, 404);
+    return context.json({ ok: true, deleted, id });
 });
 
 export default ideas;

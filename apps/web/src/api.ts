@@ -127,6 +127,16 @@ export const helpdeskApi = {
       body: JSON.stringify(idea),
     });
   },
+  async updateIdea(id: number, idea: Record<string, unknown>) {
+    const result = await request<{ idea: ApiIdea }>(`/api/ideas/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(idea),
+    });
+    return result.idea;
+  },
+  async deleteIdea(id: number) {
+    await request(`/api/ideas/${id}`, { method: "DELETE" });
+  },
   async updateTicket(id: number, ticket: Record<string, unknown>) {
     const result = await request<{ ticket: ApiTicket }>(`/api/tickets/${id}`, {
       method: "PATCH",
@@ -183,8 +193,13 @@ export function toUiIdea(idea: ApiIdea) {
     Medium: "Средний",
     High: "Высокий",
   };
+  const statuses: Record<string, "Новая" | "На рассмотрении" | "В работе" | "Закрыта"> = {
+    New: "Новая", "Under Review": "На рассмотрении", "In Progress": "В работе", Closed: "Закрыта",
+    Новая: "Новая", "На рассмотрении": "На рассмотрении", "В работе": "В работе", Закрыта: "Закрыта",
+  };
   return {
     id: idea.public_id,
+    rowId: idea.id,
     date: localizedDateTime?.date ?? (dateParts.length === 3 ? `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}` : idea.date),
     time: localizedDateTime?.time ?? idea.time?.slice(0, 5) ?? "",
     employee: idea.employee || "Не указано",
@@ -194,7 +209,7 @@ export function toUiIdea(idea: ApiIdea) {
     idea: idea.idea,
     expected: idea.expected_result || "",
     priority: priority[idea.priority] || idea.priority,
-    status: idea.status === "New" ? "Новая" : idea.status,
+    status: statuses[idea.status] || "Новая",
     assignee: idea.assignee || "Андрей",
     comment: idea.comment || "",
     photoCount: idea.photo_count ?? 0,
