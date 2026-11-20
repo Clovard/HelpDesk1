@@ -1,8 +1,6 @@
 export type TelegramMessage = {
     message_id: number;
-    chat: {
-        id: number;
-    };
+    chat: { id: number; type?: string };
     from?: {
         id: number;
         first_name?: string;

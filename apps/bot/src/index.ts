@@ -48,6 +48,12 @@ export default {
         }
 
         const chatId = message.chat.id;
+        if (message.photo?.length || message.document) {
+            if (message.chat.type === "private") {
+                await sendTelegramMessage(env.BOT_TOKEN, chatId, "Приём фото и файлов временно отключён. Отправьте описание текстом.");
+            }
+            return new Response("OK");
+        }
         const text = message.text?.trim() ?? "";
         const normalized = text.toLocaleLowerCase("ru").replace(/[✅✖❌🛠💡📋]/gu, "").trim();
 

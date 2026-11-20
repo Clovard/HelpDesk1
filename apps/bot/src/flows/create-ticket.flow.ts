@@ -1,11 +1,11 @@
 import { HelpdeskApiClient } from "../api-client";
-import { getAttachmentsKeyboard, getChoiceKeyboard, getConfirmKeyboard, getMainKeyboard, MAIN_ACTIONS } from "../keyboards/main.keyboard";
-import { getTelegramAttachment, sendTelegramMessage, type TelegramAttachment, type TelegramMessage } from "../telegram-client";
+import { getChoiceKeyboard, getConfirmKeyboard, getMainKeyboard, MAIN_ACTIONS } from "../keyboards/main.keyboard";
+import { sendTelegramMessage, type TelegramMessage } from "../telegram-client";
 import { sendToSupportChat } from "../support-chat";
 
 type BotEnv = { DB: D1Database; API_URL: string; BOT_TOKEN: string; SUPPORT_CHAT_ID?: string };
-type TicketSessionState = "city" | "department" | "system" | "type" | "problem" | "attachments" | "confirmation";
-type TicketSessionData = { employee?: string; telegramId?: string; city?: string; department?: string; system?: string; type?: string; problem?: string; attachments?: TelegramAttachment[] };
+type TicketSessionState = "city" | "department" | "system" | "type" | "problem" | "confirmation";
+type TicketSessionData = { employee?: string; telegramId?: string; city?: string; department?: string; system?: string; type?: string; problem?: string };
 type TicketSession = { state: TicketSessionState; data: TicketSessionData };
 
 const cities = ["Новосибирск", "Красноярск", "Томск", "Кемерово", "Барнаул"];
@@ -14,15 +14,20 @@ const types = ["Не работает", "Ошибка", "Доступ", "Нас�
 
 async function getSession(env: BotEnv, chatId: number): Promise<TicketSession | null> {
     const row = await env.DB.prepare("SELECT state, payload FROM bot_sessions WHERE chat_id = ?")
-        .bind(String(chatId)).first<{ state: TicketSessionState; payload: string }>();
+        .bind(String(chatId)).first<{ state: string; payload: string }>();
     if (!row) return null;
-    const data = JSON.parse(row.payload) as TicketSessionData;
-    // Discard a session from the previous English form so it cannot ask irrelevant questions.
+    const data = JSON.parse(row.payload) as TicketSessionData & { attachments?: unknown };
+    // Skip the old attachment step for sessions created before attachments were disabled.
     if ("expectedResult" in data || "scale" in data) {
         await deleteSession(env, chatId);
         return null;
     }
-    return { state: row.state, data };
+    const hadAttachments = "attachments" in data;
+    delete data.attachments;
+    const state: TicketSessionState = row.state === "attachments" ? "confirmation" : row.state as TicketSessionState;
+    const session = { state, data };
+    if (hadAttachments || row.state !== state) await saveSession(env, chatId, session);
+    return session;
 }
 
 async function saveSession(env: BotEnv, chatId: number, session: TicketSession) {
@@ -43,7 +48,6 @@ function promptFor(state: TicketSessionState) {
         system: "В какой программе или системе возникла проблема? Например: 1С, почта, принтер.",
         type: "Выберите тип проблемы:",
         problem: "Опишите, что случилось и что именно не работает.",
-        attachments: "Прикрепите скриншоты или файлы. Когда закончите, нажмите «✅ Готово». Если вложений нет — «⏭ Пропустить».",
         confirmation: "Проверьте заявку и подтвердите создание:",
     };
     return prompts[state];
@@ -53,27 +57,19 @@ function keyboardFor(state: TicketSessionState) {
     if (state === "city") return getChoiceKeyboard(cities);
     if (state === "department") return getChoiceKeyboard(departments);
     if (state === "type") return getChoiceKeyboard(types);
-    if (state === "attachments") return getAttachmentsKeyboard();
     if (state === "confirmation") return getConfirmKeyboard();
     return undefined;
 }
 
 function preview(data: TicketSessionData) {
-    const attachments = data.attachments ?? [];
-    const photoCount = attachments.filter((attachment) => attachment.kind === "photo").length;
-    const fileCount = attachments.length - photoCount;
-    const attachmentSummary = attachments.length
-        ? `Фото: ${photoCount}, файлы: ${fileCount}`
-        : "Нет";
     return ["Проверьте заявку:", "", `Сотрудник: ${data.employee || "Пользователь Telegram"}`, `Telegram: ${data.telegramId || "не указан"}`, `Город: ${data.city}`,
         `Подразделение: ${data.department}`, `Система: ${data.system}`, `Тип: ${data.type}`,
-        `Проблема: ${data.problem}`, `Вложения: ${attachmentSummary}`, "", "Создать заявку?"] .join("\n");
+        `Проблема: ${data.problem}`, "", "Создать заявку?"].join("\n");
 }
 
 export async function handleCreateTicketFlow(env: BotEnv, message: TelegramMessage) {
     const chatId = message.chat.id;
     const text = message.text?.trim();
-    const incomingAttachment = getTelegramAttachment(message);
 
     let session = await getSession(env, chatId);
     if (text && [MAIN_ACTIONS.createTicket, "Создать заявку", "🛠 создать заявку", "Create Ticket", "/ticket"].includes(text)) {
@@ -99,63 +95,16 @@ export async function handleCreateTicketFlow(env: BotEnv, message: TelegramMessa
         await sendTelegramMessage(env.BOT_TOKEN, chatId, "Создание заявки отменено.");
         return true;
     }
-
-    if (incomingAttachment) {
-        if (session.state === "problem" && incomingAttachment.caption) {
-            session.data.problem = incomingAttachment.caption;
-            session.data.attachments = [...(session.data.attachments ?? []), incomingAttachment];
-            session.state = "attachments";
-            await saveSession(env, chatId, session);
-            await sendTelegramMessage(env.BOT_TOKEN, chatId, promptFor("attachments"), keyboardFor("attachments"));
-            return true;
-        }
-        if (session.state === "problem") {
-            session.data.attachments = [...(session.data.attachments ?? []), incomingAttachment];
-            await saveSession(env, chatId, session);
-            await sendTelegramMessage(env.BOT_TOKEN, chatId, "Вложение добавлено. Теперь опишите проблему текстом.");
-            return true;
-        }
-        if (session.state === "attachments" || session.state === "confirmation") {
-            session.data.attachments = [...(session.data.attachments ?? []), incomingAttachment];
-            await saveSession(env, chatId, session);
-            if (session.state === "confirmation") {
-                await sendTelegramMessage(env.BOT_TOKEN, chatId, preview(session.data), keyboardFor("confirmation"));
-            } else {
-                await sendTelegramMessage(env.BOT_TOKEN, chatId, "Вложение добавлено. Можете отправить ещё или нажать «✅ Готово».", keyboardFor("attachments"));
-            }
-            return true;
-        }
-        await sendTelegramMessage(env.BOT_TOKEN, chatId, "Сначала завершите текущий шаг. Вложения можно отправить после описания проблемы.");
-        return true;
-    }
-
     if (!text) return false;
-
-    if (session.state === "attachments") {
-        if (["✅ готово", "готово", "дальше", "⏭ пропустить", "пропустить", "без вложений"].includes(normalized)) {
-            session.state = "confirmation";
-            await saveSession(env, chatId, session);
-            await sendTelegramMessage(env.BOT_TOKEN, chatId, preview(session.data), keyboardFor("confirmation"));
-        } else {
-            await sendTelegramMessage(env.BOT_TOKEN, chatId, "Отправьте фото или файл, затем нажмите «✅ Готово». Если вложений нет — «⏭ Пропустить».", keyboardFor("attachments"));
-        }
-        return true;
-    }
-
     if (session.state === "confirmation") {
         if (!["✅ да, создать", "да", "создать"].includes(normalized)) {
             await sendTelegramMessage(env.BOT_TOKEN, chatId, "Нажмите «✅ Да, создать» или «✖ Отмена».", getConfirmKeyboard());
             return true;
         }
-        const attachments = session.data.attachments ?? [];
-        const photoCount = attachments.filter((attachment) => attachment.kind === "photo").length;
-        const fileCount = attachments.length - photoCount;
         const result = await new HelpdeskApiClient({ apiUrl: env.API_URL }).createTicket({
             employee: session.data.employee!, city: session.data.city, department: session.data.department,
             system: session.data.system, type: session.data.type, problem: session.data.problem!,
             employeeTelegramId: session.data.telegramId,
-            photoCount,
-            fileCount,
         }) as { ok: boolean; publicId?: string; ticket?: { public_id?: string }; error?: string };
         await deleteSession(env, chatId);
         if (!result.ok) {
@@ -172,20 +121,18 @@ export async function handleCreateTicketFlow(env: BotEnv, message: TelegramMessa
             `Система: ${session.data.system}`,
             `Тип: ${session.data.type}`,
             `Проблема: ${session.data.problem}`,
-            `Вложения: ${photoCount ? `фото ${photoCount}` : ""}${photoCount && fileCount ? ", " : ""}${fileCount ? `файлы ${fileCount}` : ""}${!attachments.length ? "нет" : ""}`,
             "Уровень: L1",
             "Ответственный: Андрей",
         ].join("\n");
-        const supportDelivery = await sendToSupportChat(env.BOT_TOKEN, env.SUPPORT_CHAT_ID, publicId, summary, attachments);
+        const supportDelivery = await sendToSupportChat(env.BOT_TOKEN, env.SUPPORT_CHAT_ID, publicId, summary, []);
         let deliveryNote = "";
         if (!supportDelivery.configured) deliveryNote = "\nУведомление в рабочую группу не отправлено: в Worker не задан SUPPORT_CHAT_ID.";
         else if (!supportDelivery.summarySent) deliveryNote = "\nНе удалось отправить копию в рабочую группу. Проверьте chat ID и права бота.";
-        else if (supportDelivery.sentAttachmentCount < supportDelivery.attachmentCount) deliveryNote = `\nВ группу отправлено вложений: ${supportDelivery.sentAttachmentCount} из ${supportDelivery.attachmentCount}.`;
         await sendTelegramMessage(env.BOT_TOKEN, chatId, `✅ Заявка создана!\nНомер: ${publicId}${deliveryNote}`, getMainKeyboard());
         return true;
     }
 
-    const order: TicketSessionState[] = ["city", "department", "system", "type", "problem", "attachments", "confirmation"];
+    const order: TicketSessionState[] = ["city", "department", "system", "type", "problem", "confirmation"];
     const currentIndex = order.indexOf(session.state);
     if (currentIndex < 0) { await deleteSession(env, chatId); return false; }
     if (session.state === "city" && !cities.includes(text)) {
