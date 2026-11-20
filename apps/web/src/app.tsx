@@ -1490,12 +1490,13 @@ function Kanban({
                 >
                   <div className="kanban-top">
                     <strong>{ticket.publicId}</strong>
-                    <span className="level-chip">{ticket.level}</span>
+                    <span className="kanban-level"><small>Уровень</small><b>{ticket.level || "—"}</b></span>
                   </div>
                   <h3>{ticket.problem}</h3>
-                  <div className="kanban-tags">
-                    <span>{ticket.system}</span>
-                    <span>{ticket.type}</span>
+                  <div className="kanban-fields">
+                    <div><small>Система</small><strong title={ticket.system || "Не указана"}>{ticket.system || "Не указана"}</strong></div>
+                    <div><small>Тип</small><strong title={ticket.type || "Не указан"}>{ticket.type || "Не указан"}</strong></div>
+                    <div><small>Город</small><strong title={ticket.city || "Не указан"}>{ticket.city || "Не указан"}</strong></div>
                   </div>
                   <div className="kanban-person">
                     <span className="mini-avatar">
@@ -1512,7 +1513,7 @@ function Kanban({
                   </div>
                   <footer>
                     <span>{ticket.date}</span>
-                    <span>{ticket.assignee}</span>
+                    <span className="kanban-assignee"><small>Ответственный</small><strong>{ticket.assignee || "Не назначен"}</strong></span>
                   </footer>
                 </article>
               ))}
@@ -1615,8 +1616,11 @@ function IdeasPage({
                   {columnIdeas.map((idea) => <article className="kanban-card" key={idea.rowId} draggable onDragStart={() => onDragStart(idea.rowId)} onClick={() => onOpen(idea)}>
                     <div className="kanban-top"><strong>{idea.id}</strong><span className={`priority ${idea.priority === "Высокий" ? "high" : ""}`}>{idea.priority}</span></div>
                     <h3>{idea.idea}</h3>
-                    <div className="kanban-tags"><span>{idea.system || "Без системы"}</span><span>{idea.city || "Город не указан"}</span></div>
-                    <div className="kanban-person"><span className="mini-avatar">{idea.employee.slice(0, 1)}</span><span><strong>{idea.employee}</strong><small>{idea.assignee || "Не назначен"}</small></span></div>
+                    <div className="kanban-fields">
+                      <div><small>Система</small><strong title={idea.system || "Не указана"}>{idea.system || "Не указана"}</strong></div>
+                      <div><small>Город</small><strong title={idea.city || "Не указан"}>{idea.city || "Не указан"}</strong></div>
+                    </div>
+                    <div className="kanban-person"><span className="mini-avatar">{idea.employee.slice(0, 1)}</span><span><strong>{idea.employee}</strong><small>Ответственный: {idea.assignee || "Не назначен"}</small></span></div>
                     <footer><span>{idea.date}</span><span>{attachmentSummary(idea.photoCount, idea.fileCount)}</span></footer>
                   </article>)}
                   {!columnIdeas.length && <div className="kanban-empty">Перетащите идею сюда</div>}
