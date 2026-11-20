@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { getApiUrl, helpdeskApi, saveApiUrl, toApiStatus, toUiIdea, toUiTicket } from "./api";
+import { getApiUrl, helpdeskApi, normalizeTicketAssignee, saveApiUrl, ticketAssigneeForLevel, ticketLevelForAssignee, toApiStatus, toUiIdea, toUiTicket } from "./api";
 
 type View = "tickets" | "ideas" | "settings";
 type TicketView = "list" | "kanban";
@@ -88,8 +88,8 @@ const initialTickets: Ticket[] = [
     expected: "Отчёт формируется без ошибок",
     status: "Новая",
     comment: "",
-    level: "L2",
-    assignee: "Не назначен",
+    level: "L1",
+    assignee: "Андрей",
     scale: "Один сотрудник",
   },
   {
@@ -126,8 +126,8 @@ const initialTickets: Ticket[] = [
     expected: "Получить права на просмотр и загрузку",
     status: "На рассмотрении",
     comment: "Запрошено согласование руководителя",
-    level: "L1",
-    assignee: "Тёма",
+    level: "L2",
+    assignee: "Артём",
     scale: "Один сотрудник",
   },
   {
@@ -145,7 +145,7 @@ const initialTickets: Ticket[] = [
     expected: "Печать этикетки формата 100×70 мм",
     status: "Закрыта",
     comment: "Шаблон добавлен и протестирован",
-    level: "L2",
+    level: "L1",
     assignee: "Андрей",
     scale: "Подразделение",
   },
@@ -164,7 +164,7 @@ const initialTickets: Ticket[] = [
     expected: "Стабильное подключение из дома",
     status: "В работе",
     comment: "Диагностика соединения",
-    level: "L2",
+    level: "L3",
     assignee: "Пентагон",
     scale: "Один сотрудник",
   },
@@ -183,8 +183,8 @@ const initialTickets: Ticket[] = [
     expected: "Единая подпись у всей команды",
     status: "Закрыта",
     comment: "Шаблон применён",
-    level: "L1",
-    assignee: "Тёма",
+    level: "L2",
+    assignee: "Артём",
     scale: "Подразделение",
   },
 ];
@@ -1882,7 +1882,7 @@ function CreateTicketPanel({
       status: "Новая",
       comment: "",
       level: "L1",
-      assignee: "Не назначен",
+      assignee: "Андрей",
       scale: form.scale,
       });
     } catch {
@@ -2026,8 +2026,16 @@ function TicketPanel({
   notify: (message: string) => void;
 }) {
   const [draft, setDraft] = useState(ticket);
-  const set = (key: keyof Ticket, value: string) =>
-    setDraft((current) => ({ ...current, [key]: value }));
+  const set = (key: keyof Ticket, value: string) => setDraft((current) => {
+    if (key === "level") {
+      return { ...current, level: value, assignee: ticketAssigneeForLevel(value) ?? current.assignee };
+    }
+    if (key === "assignee") {
+      const assignee = normalizeTicketAssignee(value);
+      return { ...current, assignee, level: ticketLevelForAssignee(assignee) ?? current.level };
+    }
+    return { ...current, [key]: value };
+  });
   async function save() {
     try {
       await onSave(draft);
@@ -2182,7 +2190,7 @@ function TicketPanel({
                 value={draft.assignee}
                 disabled={!editing}
                 onChange={(value) => set("assignee", value)}
-                options={["Не назначен", "Андрей", "Тёма", "Пентагон"]}
+                options={["Андрей", "Артём", "Пентагон"]}
               />
             </div>
             <DetailField

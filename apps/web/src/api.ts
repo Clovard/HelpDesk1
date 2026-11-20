@@ -1,3 +1,22 @@
+export const ticketAssigneeByLevel: Record<string, string> = { L1: "Андрей", L2: "Артём", L3: "Пентагон" };
+
+export function normalizeTicketAssignee(value: string | null | undefined) {
+  const normalized = value?.trim().toLocaleLowerCase("ru") ?? "";
+  if (["тёма", "тема", "артем", "артём", "tema", "artem"].includes(normalized)) return "Артём";
+  if (normalized === "пентагон") return "Пентагон";
+  if (normalized === "андрей" || !normalized || normalized === "не назначен") return "Андрей";
+  return value!.trim();
+}
+
+export function ticketLevelForAssignee(value: string | null | undefined) {
+  const assignee = normalizeTicketAssignee(value);
+  return Object.entries(ticketAssigneeByLevel).find(([, name]) => name === assignee)?.[0];
+}
+
+export function ticketAssigneeForLevel(level: string) {
+  return ticketAssigneeByLevel[level];
+}
+
 const defaultApiUrl = import.meta.env.VITE_API_URL || "https://helpdesk-api.andrejsarafonov.workers.dev";
 const apiUrlKey = "ugli-helpdesk-api-url";
 
@@ -161,6 +180,7 @@ export function toUiTicket(ticket: ApiTicket) {
     Закрыта: "Закрыта",
   };
   const localizedDateTime = formatStoredDateTime(ticket.date, ticket.time);
+  const assignee = normalizeTicketAssignee(ticket.assignee);
   const dateParts = ticket.date?.slice(0, 10).split("-") ?? [];
   return {
     id: ticket.id,
@@ -177,8 +197,8 @@ export function toUiTicket(ticket: ApiTicket) {
     expected: ticket.expected_result || "",
     status: status[ticket.status] || "Новая",
     comment: ticket.it_comment || "",
-    level: ticket.support_level || "L1",
-    assignee: ticket.assignee || "Андрей",
+    level: ticketLevelForAssignee(assignee) || ticket.support_level || "L1",
+    assignee,
     scale: ticket.scale || "",
     photoCount: ticket.photo_count ?? 0,
     fileCount: ticket.file_count ?? 0,

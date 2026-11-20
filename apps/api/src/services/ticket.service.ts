@@ -12,6 +12,22 @@ export type CreateTicketInput = {
     scale?: string;
 };
 
+const assigneeByLevel: Record<"L1" | "L2" | "L3", string> = {
+    L1: "Андрей",
+    L2: "Артём",
+    L3: "Пентагон",
+};
+
+function normalizeAssignee(value: string | null | undefined) {
+    const normalized = value?.trim().toLocaleLowerCase("ru") ?? "";
+    if (["тёма", "тема", "артем", "артём", "tema", "artem"].includes(normalized)) return "Артём";
+    if (normalized === "пентагон") return "Пентагон";
+    return "Андрей";
+}
+
+function levelForAssignee(assignee: string) {
+    return (Object.entries(assigneeByLevel).find(([, name]) => name === assignee)?.[0] ?? "L1") as "L1" | "L2" | "L3";
+}
 export type UpdateTicketInput = {
     date?: string;
     time?: string;
@@ -160,8 +176,18 @@ input: UpdateTicketInput,
     const nextExpectedResult = input.expectedResult === undefined ? current.expected_result : input.expectedResult;
     const nextStatus = input.status ?? current.status;
     const nextComment = input.itComment === undefined ? current.it_comment : input.itComment;
-    const nextLevel = input.supportLevel === undefined ? current.support_level : input.supportLevel;
-    const nextAssignee = input.assignee === undefined ? current.assignee : input.assignee;
+    const currentAssignee = normalizeAssignee(current.assignee);
+    let nextLevel = input.supportLevel === undefined ? current.support_level : input.supportLevel;
+    let nextAssignee = currentAssignee;
+    if (input.assignee !== undefined) {
+        nextAssignee = normalizeAssignee(input.assignee);
+        nextLevel = levelForAssignee(nextAssignee);
+    } else if (input.supportLevel !== undefined) {
+        nextLevel = input.supportLevel && input.supportLevel in assigneeByLevel ? input.supportLevel : "L1";
+        nextAssignee = assigneeByLevel[nextLevel as "L1" | "L2" | "L3"];
+    } else {
+        nextLevel = levelForAssignee(nextAssignee);
+    }
     const nextScale = input.scale === undefined ? current.scale : input.scale;
 
     await env.DB.prepare(
