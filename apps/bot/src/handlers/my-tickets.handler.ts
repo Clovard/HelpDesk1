@@ -137,18 +137,21 @@ async function handleTicketClosureCallback(
     env: BotEnv,
     callback: NonNullable<TelegramUpdate["callback_query"]>,
 ) {
-    const match = /^ticket_closed:(\d+):(yes|no)$/.exec(callback.data ?? "");
+    const match = /^tc:(\d+):([a-f0-9-]{36}):(yes|no)$/.exec(callback.data ?? "")
+        ?? /^ticket_closed:(\d+):(yes|no)$/.exec(callback.data ?? "");
     if (!match) return false;
     if (!callback.message || callback.message.chat.type !== "private") {
         await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Подтверждение доступно только в личном чате с ботом.");
         return true;
     }
 
+    const isLegacyCallback = match.length === 3;
     const ticketId = Number(match[1]);
-    const decision = match[2] as "yes" | "no";
+    const closureToken = isLegacyCallback ? null : match[2];
+    const decision = (isLegacyCallback ? match[2] : match[3]) as "yes" | "no";
     const telegramUserId = String(callback.from.id);
     const ticket = await env.DB.prepare(`
-        SELECT id, public_id, employee, status
+        SELECT id, public_id, employee, status, initiator_acceptance, closure_confirmation_token
         FROM tickets
         WHERE id = ? AND (
             telegram_user_id = ? OR
@@ -164,7 +167,14 @@ async function handleTicketClosureCallback(
         `Идентификатор: ${telegramUserId}`,
         `%ID: ${telegramUserId})%`,
         `%идентификатор: ${telegramUserId})%`,
-    ).first<{ id: number; public_id: string; employee: string; status: string }>();
+    ).first<{
+        id: number;
+        public_id: string;
+        employee: string;
+        status: string;
+        initiator_acceptance: string | null;
+        closure_confirmation_token: string | null;
+    }>();
 
     if (!ticket) {
         await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Заявка не найдена в вашем аккаунте.");
@@ -174,50 +184,70 @@ async function handleTicketClosureCallback(
         await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Статус заявки уже изменён.");
         return true;
     }
+    if (ticket.initiator_acceptance !== "pending") {
+        await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Ваш ответ уже учтён.");
+        return true;
+    }
+    if (ticket.closure_confirmation_token !== closureToken) {
+        await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Это уведомление уже устарело. Откройте последнее сообщение о закрытии заявки.");
+        return true;
+    }
 
     const senderName = [callback.from.first_name, callback.from.last_name].filter(Boolean).join(" ").trim()
         || (callback.from.username ? `@${callback.from.username}` : "Сотрудник");
     const confirmation = decision === "yes"
         ? "Сотрудник подтвердил, что проблема решена."
         : "Сотрудник сообщил, что проблема осталась.";
-    const inserted = await env.DB.prepare(`
-        INSERT OR IGNORE INTO ticket_messages (
-            ticket_id, sender_type, sender_telegram_id, telegram_message_id, sender_name, body
-        ) VALUES (?, 'employee', ?, ?, ?, ?)
-    `).bind(
-        ticket.id,
-        telegramUserId,
-        callback.message.message_id,
-        senderName,
-        confirmation,
-    ).run();
+    const nextAcceptance = decision === "yes" ? "accepted" : "rejected";
+    const updateAndRecord = await env.DB.batch([
+        env.DB.prepare(`
+            UPDATE tickets
+            SET initiator_acceptance = ?,
+                status = CASE WHEN ? = 'no' THEN 'In Progress' ELSE status END,
+                closed_at = CASE WHEN ? = 'no' THEN NULL ELSE closed_at END,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND status = 'Closed' AND initiator_acceptance = 'pending'
+                AND closure_confirmation_token IS ?
+        `).bind(nextAcceptance, decision, decision, ticket.id, closureToken),
+        env.DB.prepare(`
+            INSERT OR IGNORE INTO ticket_messages (
+                ticket_id, sender_type, sender_telegram_id, telegram_message_id, sender_name, body
+            )
+            SELECT ?, 'employee', ?, ?, ?, ?
+            WHERE EXISTS (
+                SELECT 1 FROM tickets
+                WHERE id = ? AND initiator_acceptance = ? AND closure_confirmation_token IS ?
+            )
+        `).bind(
+            ticket.id,
+            telegramUserId,
+            callback.message.message_id,
+            senderName,
+            confirmation,
+            ticket.id,
+            nextAcceptance,
+            closureToken,
+        ),
+    ]);
+    const accepted = updateAndRecord[0].meta.changes > 0;
+    const reopened = accepted && decision === "no";
 
-    if (inserted.meta.changes === 0) {
-        await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Ваш ответ уже учтён.");
+    if (!accepted) {
+        await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Ответ уже учтён или уведомление устарело.");
         return true;
     }
 
-    let reopened = false;
-    if (decision === "no") {
-        const update = await env.DB.prepare(`
-            UPDATE tickets
-            SET status = 'In Progress', closed_at = NULL, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ? AND status = 'Closed'
-        `).bind(ticket.id).run();
-        reopened = update.meta.changes > 0;
-
-        if (reopened) {
-            await env.DB.prepare(`
-                INSERT INTO ticket_events (ticket_id, event_type, old_value, new_value, author_name)
-                VALUES (?, 'status_changed', 'Closed', 'In Progress', ?)
-            `).bind(ticket.id, senderName).run();
-            if (env.SUPPORT_CHAT_ID) {
-                await sendTelegramMessage(
-                    env.BOT_TOKEN,
-                    env.SUPPORT_CHAT_ID,
-                    `⚠️ Сотрудник сообщил, что заявка ${ticket.public_id} не решена. Статус возвращён в «В работе».\nСотрудник: ${senderName}`,
-                );
-            }
+    if (reopened) {
+        await env.DB.prepare(`
+            INSERT INTO ticket_events (ticket_id, event_type, old_value, new_value, author_name)
+            VALUES (?, 'status_changed', 'Closed', 'In Progress', ?)
+        `).bind(ticket.id, senderName).run();
+        if (env.SUPPORT_CHAT_ID) {
+            await sendTelegramMessage(
+                env.BOT_TOKEN,
+                env.SUPPORT_CHAT_ID,
+                `⚠️ Сотрудник сообщил, что заявка ${ticket.public_id} не решена. Статус возвращён в «В работе».\nСотрудник: ${senderName}`,
+            );
         }
     }
 

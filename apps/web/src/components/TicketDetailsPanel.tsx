@@ -9,6 +9,11 @@ const statusLabels: Record<TicketStatus, string> = {
     "In Progress": "В работе",
     Closed: "Закрыта",
 };
+const initiatorAcceptanceLabels: Record<NonNullable<Ticket["initiator_acceptance"]>, string> = {
+    accepted: "Принята",
+    rejected: "Не принята",
+    pending: "Ожидает ответа",
+};
 const levels = ["", "L1", "L2", "L3"];
 const responsibles = ["", "Andrey", "Tema", "Pentagon"];
 
@@ -156,6 +161,7 @@ export default function TicketDetailsPanel({ ticket, onClose, onSaved, onDeleted
                         {field("Время", draft.time, "time")}
                         {field("Сотрудник", draft.employee, "employee")}
                         {!editing && <label className="details-field"><span>Telegram</span><strong>{ticket.employee_telegram_id || "—"}</strong></label>}
+                        {!editing && <label className="details-field"><span>Приемка инициатором</span><strong>{ticket.initiator_acceptance ? initiatorAcceptanceLabels[ticket.initiator_acceptance] : "—"}</strong></label>}
                         {field("Город", draft.city, "city")}
                         {field("Подразделение", draft.department, "department")}
                         {field("Система", draft.system, "system")}

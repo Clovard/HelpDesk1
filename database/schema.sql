@@ -37,6 +37,8 @@ scale TEXT,
 
 employee_telegram_id TEXT,
 telegram_user_id TEXT,
+initiator_acceptance TEXT CHECK (initiator_acceptance IS NULL OR initiator_acceptance IN ('pending', 'accepted', 'rejected')),
+closure_confirmation_token TEXT,
 photo_count INTEGER NOT NULL DEFAULT 0,
 file_count INTEGER NOT NULL DEFAULT 0,
 

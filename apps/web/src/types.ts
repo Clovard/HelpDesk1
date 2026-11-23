@@ -26,6 +26,7 @@ export type Ticket = {
     created_at: string;
     updated_at: string;
     closed_at: string | null;
+    initiator_acceptance: "pending" | "accepted" | "rejected" | null;
     photo_count?: number;
     file_count?: number;
 };

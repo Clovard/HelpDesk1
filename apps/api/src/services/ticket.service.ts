@@ -24,6 +24,7 @@ async function notifyEmployeeToConfirmClosure(env: Env, ticket: {
     problem: string;
     telegram_user_id: string | null;
     employee_telegram_id: string | null;
+    closure_confirmation_token: string;
 }) {
     if (!env.BOT_TOKEN) return;
     const telegramId = ticket.telegram_user_id
@@ -39,8 +40,8 @@ async function notifyEmployeeToConfirmClosure(env: Env, ticket: {
                 text: `Заявка ${ticket.public_id} отмечена как закрытая. Подтвердите, пожалуйста, проблема действительно решена?`,
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: "✅ Да, проблема решена", callback_data: `ticket_closed:${ticket.id}:yes` }],
-                        [{ text: "❌ Нет, проблема осталась", callback_data: `ticket_closed:${ticket.id}:no` }],
+                        [{ text: "✅ Да, проблема решена", callback_data: `tc:${ticket.id}:${ticket.closure_confirmation_token}:yes` }],
+                        [{ text: "❌ Нет, проблема осталась", callback_data: `tc:${ticket.id}:${ticket.closure_confirmation_token}:no` }],
                     ],
                 },
             }),
@@ -218,6 +219,9 @@ input: UpdateTicketInput,
     const nextType = input.type === undefined ? current.type : input.type;
     const nextProblem = input.problem ?? current.problem;
     const nextStatus = input.status ?? current.status;
+    const nextClosureToken = current.status !== "Closed" && nextStatus === "Closed"
+        ? crypto.randomUUID()
+        : null;
     const nextComment = input.itComment === undefined ? current.it_comment : input.itComment;
     const currentAssignee = normalizeAssignee(current.assignee);
     let nextLevel = input.supportLevel === undefined ? current.support_level : input.supportLevel;
@@ -255,6 +259,16 @@ input: UpdateTicketInput,
           WHEN ? = 'Closed'
             THEN CURRENT_TIMESTAMP
           ELSE closed_at
+        END,
+        initiator_acceptance = CASE
+          WHEN status <> 'Closed' AND ? = 'Closed' THEN 'pending'
+          WHEN ? <> 'Closed' AND initiator_acceptance = 'pending' THEN NULL
+          ELSE initiator_acceptance
+        END,
+        closure_confirmation_token = CASE
+          WHEN status <> 'Closed' AND ? = 'Closed' THEN ?
+          WHEN ? <> 'Closed' THEN NULL
+          ELSE closure_confirmation_token
         END
       WHERE id = ?
     `,
@@ -273,6 +287,11 @@ input: UpdateTicketInput,
     nextLevel,
     nextAssignee,
     nextScale,
+    nextStatus,
+    nextStatus,
+    nextClosureToken,
+    nextStatus,
+    nextStatus,
     nextStatus,
     id,
     )
@@ -308,6 +327,7 @@ input: UpdateTicketInput,
             problem: nextProblem,
             telegram_user_id: current.telegram_user_id,
             employee_telegram_id: current.employee_telegram_id,
+            closure_confirmation_token: nextClosureToken!,
         });
     }
 

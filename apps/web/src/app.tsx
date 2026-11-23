@@ -22,6 +22,7 @@ type Ticket = {
   employee: string;
   telegram: string;
   telegramUserId: string;
+  initiatorAcceptance: "pending" | "accepted" | "rejected" | null;
   city: string;
   department: string;
   system: string;
@@ -93,6 +94,7 @@ const initialTickets: Ticket[] = [
     employee: "Андрей Сарафонов",
     telegram: "@sarafonov_a",
     telegramUserId: "",
+    initiatorAcceptance: null,
     city: "Новосибирск",
     department: "Офис",
     system: "1С",
@@ -112,6 +114,7 @@ const initialTickets: Ticket[] = [
     employee: "Виталина Петрова",
     telegram: "@vitalina_p",
     telegramUserId: "",
+    initiatorAcceptance: null,
     city: "Новосибирск",
     department: "Кадровые службы",
     system: "ПК",
@@ -131,6 +134,7 @@ const initialTickets: Ticket[] = [
     employee: "Мария Лаврова",
     telegram: "@maria_l",
     telegramUserId: "",
+    initiatorAcceptance: null,
     city: "Москва",
     department: "Финансы",
     system: "Битрикс24",
@@ -150,6 +154,7 @@ const initialTickets: Ticket[] = [
     employee: "Игорь Власов",
     telegram: "@vlasov_i",
     telegramUserId: "",
+    initiatorAcceptance: null,
     city: "Томск",
     department: "Логистика",
     system: "WMS",
@@ -169,6 +174,7 @@ const initialTickets: Ticket[] = [
     employee: "Сергей Орлов",
     telegram: "@orlov_s",
     telegramUserId: "",
+    initiatorAcceptance: null,
     city: "Новосибирск",
     department: "Продажи",
     system: "VPN",
@@ -188,6 +194,7 @@ const initialTickets: Ticket[] = [
     employee: "Ольга Белова",
     telegram: "@belova_o",
     telegramUserId: "",
+    initiatorAcceptance: null,
     city: "Москва",
     department: "Маркетинг",
     system: "Почта",
@@ -430,7 +437,11 @@ function App() {
     if (showLoading) setLoading(true);
     try {
       const [apiTickets, apiIdeas] = await Promise.all([helpdeskApi.tickets(), helpdeskApi.ideas()]);
-      setTickets(apiTickets.map(toUiTicket));
+      const mappedTickets = apiTickets.map(toUiTicket);
+      setTickets(mappedTickets);
+      setSelected((current) => current
+        ? mappedTickets.find((ticket) => ticket.id === current.id) ?? current
+        : current);
       setIdeas(apiIdeas.map(toUiIdea));
       setApiOnline(true);
       if (showMessage) notify("Данные обновлены");
@@ -2106,6 +2117,7 @@ function CreateTicketPanel({
       employee: form.employee,
       telegram: "—",
       telegramUserId: "",
+      initiatorAcceptance: null,
       city: form.city,
       department: form.department,
       system: form.system,
@@ -2259,6 +2271,10 @@ function TicketPanel({
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!editing) setDraft(ticket);
+  }, [ticket, editing]);
+
+  useEffect(() => {
     let active = true;
     const refreshMessages = async () => {
       try {
@@ -2388,6 +2404,12 @@ function TicketPanel({
                 onChange={(value) => set("employee", value)}
               />
               <DetailField label="Telegram" value={draft.telegram} />
+              <DetailField
+                label="Приемка инициатором"
+                value={ticket.initiatorAcceptance === "accepted" ? "Принята"
+                  : ticket.initiatorAcceptance === "rejected" ? "Не принята"
+                    : ticket.initiatorAcceptance === "pending" ? "Ожидает ответа" : "—"}
+              />
               <DetailField
                 label="Город"
                 value={draft.city}

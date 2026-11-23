@@ -38,6 +38,7 @@ export type ApiTicket = {
   scale: string | null;
   employee_telegram_id: string | null;
   telegram_user_id?: string | null;
+  initiator_acceptance: "pending" | "accepted" | "rejected" | null;
   photo_count?: number;
   file_count?: number;
 };
@@ -228,6 +229,7 @@ export function toUiTicket(ticket: ApiTicket) {
     employee: ticket.employee || "Не указано",
     telegram: ticket.employee_telegram_id || "—",
     telegramUserId: ticket.telegram_user_id || /(?:ID|идентификатор)\s*:\s*(\d+)/i.exec(ticket.employee_telegram_id || "")?.[1] || "",
+    initiatorAcceptance: ticket.initiator_acceptance,
     city: ticket.city || "",
     department: ticket.department || "",
     system: ticket.system || "",
