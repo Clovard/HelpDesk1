@@ -1114,6 +1114,42 @@ tbody tr {
 tbody tr:hover {
   background: #fcfcfc;
 }
+.table-wrap tbody tr.ticket-row.status-new {
+  background: #fbf9ff;
+}
+.table-wrap tbody tr.ticket-row.status-review {
+  background: #fffaf1;
+}
+.table-wrap tbody tr.ticket-row.status-progress {
+  background: #f6f9ff;
+}
+.table-wrap tbody tr.ticket-row.status-closed {
+  background: #f4fbf8;
+}
+.table-wrap tbody tr.ticket-row.status-new:hover {
+  background: #f3efff;
+}
+.table-wrap tbody tr.ticket-row.status-review:hover {
+  background: #fff3dc;
+}
+.table-wrap tbody tr.ticket-row.status-progress:hover {
+  background: #eaf1ff;
+}
+.table-wrap tbody tr.ticket-row.status-closed:hover {
+  background: #e7f6ef;
+}
+.table-wrap tbody tr.ticket-row.status-new td:first-child {
+  box-shadow: inset 3px 0 #7057d9;
+}
+.table-wrap tbody tr.ticket-row.status-review td:first-child {
+  box-shadow: inset 3px 0 #b7791f;
+}
+.table-wrap tbody tr.ticket-row.status-progress td:first-child {
+  box-shadow: inset 3px 0 #3567cf;
+}
+.table-wrap tbody tr.ticket-row.status-closed td:first-child {
+  box-shadow: inset 3px 0 #23856d;
+}
 tbody tr:last-child td {
   border-bottom: 0;
 }
@@ -1315,6 +1351,38 @@ tbody tr:last-child td {
 .kanban-card:hover {
   border-color: #b8c4eb;
   box-shadow: 0 4px 14px rgba(59, 92, 204, 0.1);
+}
+.kanban-card.status-new {
+  border-color: #e3dafb;
+  background: linear-gradient(145deg, #fff 0%, #faf8ff 100%);
+  box-shadow: inset 3px 0 #7057d9, 0 2px 5px rgba(42, 42, 42, 0.035);
+}
+.kanban-card.status-review {
+  border-color: #f0dfbd;
+  background: linear-gradient(145deg, #fff 0%, #fffaf1 100%);
+  box-shadow: inset 3px 0 #c58a2a, 0 2px 5px rgba(42, 42, 42, 0.035);
+}
+.kanban-card.status-progress {
+  border-color: #d7e2fb;
+  background: linear-gradient(145deg, #fff 0%, #f5f8ff 100%);
+  box-shadow: inset 3px 0 #3567cf, 0 2px 5px rgba(42, 42, 42, 0.035);
+}
+.kanban-card.status-closed {
+  border-color: #d1eadf;
+  background: linear-gradient(145deg, #fff 0%, #f2faf6 100%);
+  box-shadow: inset 3px 0 #23856d, 0 2px 5px rgba(42, 42, 42, 0.035);
+}
+.kanban-card.status-new:hover {
+  box-shadow: inset 3px 0 #7057d9, 0 5px 15px rgba(112, 87, 217, 0.16);
+}
+.kanban-card.status-review:hover {
+  box-shadow: inset 3px 0 #c58a2a, 0 5px 15px rgba(197, 138, 42, 0.16);
+}
+.kanban-card.status-progress:hover {
+  box-shadow: inset 3px 0 #3567cf, 0 5px 15px rgba(53, 103, 207, 0.16);
+}
+.kanban-card.status-closed:hover {
+  box-shadow: inset 3px 0 #23856d, 0 5px 15px rgba(35, 133, 109, 0.16);
 }
 .kanban-top,
 .kanban-card footer {

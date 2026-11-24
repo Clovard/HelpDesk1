@@ -1394,7 +1394,7 @@ function TicketTable({
           </thead>
           <tbody>
             {tickets.map((ticket) => (
-              <tr key={ticket.id} onClick={() => onOpen(ticket)}>
+              <tr key={ticket.id} className={`ticket-row ${statusMeta[ticket.status].tone}`} onClick={() => onOpen(ticket)}>
                 <td>
                   <strong className="ticket-id">{ticket.publicId}</strong>
                 </td>
@@ -1493,7 +1493,7 @@ function Kanban({
             <div className="kanban-stack">
               {columnTickets.map((ticket) => (
                 <article
-                  className="kanban-card"
+                  className={`kanban-card ${statusMeta[ticket.status].tone}`}
                   key={ticket.id}
                   draggable
                   onDragStart={() => onDragStart(ticket.id)}
