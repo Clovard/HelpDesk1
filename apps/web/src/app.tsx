@@ -79,10 +79,10 @@ const statuses: TicketStatus[] = ["Новая", "На рассмотрении",
 const supportLevels = ["L1", "L2", "L3"];
 const ideaStatuses: IdeaStatus[] = ["Новая", "На рассмотрении", "В работе", "Закрыта"];
 const statusMeta: Record<TicketStatus, { tone: string; dot: string }> = {
-  Новая: { tone: "status-new", dot: "#7057D9" },
-  "На рассмотрении": { tone: "status-review", dot: "#B7791F" },
-  "В работе": { tone: "status-progress", dot: "#3567CF" },
-  Закрыта: { tone: "status-closed", dot: "#23856D" },
+  Новая: { tone: "status-new", dot: "#42A5D5" },
+  "На рассмотрении": { tone: "status-review", dot: "#5279E6" },
+  "В работе": { tone: "status-progress", dot: "#D88A24" },
+  Закрыта: { tone: "status-closed", dot: "#3B9D75" },
 };
 
 const initialTickets: Ticket[] = [
