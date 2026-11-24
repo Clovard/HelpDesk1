@@ -3,6 +3,28 @@ import { getApiUrl, helpdeskApi, normalizeTicketAssignee, saveApiUrl, ticketAssi
 
 type View = "tickets" | "ideas" | "messages" | "settings";
 type TicketView = "list" | "kanban";
+type SavedWorkspaceState = {
+  view: View;
+  ticketView: TicketView;
+  ideaView: TicketView;
+  scrollY: number;
+};
+const SAVED_WORKSPACE_KEY = "ugli-helpdesk-workspace";
+function readSavedWorkspace(): SavedWorkspaceState {
+  const defaults: SavedWorkspaceState = { view: "tickets", ticketView: "list", ideaView: "list", scrollY: 0 };
+  try {
+    const saved = JSON.parse(localStorage.getItem(SAVED_WORKSPACE_KEY) || "null") as Partial<SavedWorkspaceState> | null;
+    if (!saved) return defaults;
+    return {
+      view: ["tickets", "ideas", "messages", "settings"].includes(saved.view || "") ? saved.view! : defaults.view,
+      ticketView: saved.ticketView === "kanban" ? "kanban" : defaults.ticketView,
+      ideaView: saved.ideaView === "kanban" ? "kanban" : defaults.ideaView,
+      scrollY: typeof saved.scrollY === "number" && Number.isFinite(saved.scrollY) ? Math.max(0, saved.scrollY) : 0,
+    };
+  } catch {
+    return defaults;
+  }
+}
 type IdeaStatus = TicketStatus;
 type IdeaFilters = { city: string; priority: string; status: string; assignee: string };
 type ExportKind = "tickets" | "ideas";
@@ -404,9 +426,10 @@ function downloadCsv(filename: string, headers: string[], rows: string[][]) {
 }
 
 function App() {
-  const [view, setView] = useState<View>("tickets");
-  const [ticketView, setTicketView] = useState<TicketView>("list");
-  const [ideaView, setIdeaView] = useState<TicketView>("list");
+  const [initialWorkspace] = useState(readSavedWorkspace);
+  const [view, setView] = useState<View>(initialWorkspace.view);
+  const [ticketView, setTicketView] = useState<TicketView>(initialWorkspace.ticketView);
+  const [ideaView, setIdeaView] = useState<TicketView>(initialWorkspace.ideaView);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [apiOnline, setApiOnline] = useState(false);
@@ -430,6 +453,39 @@ function App() {
   const [editingIdea, setEditingIdea] = useState(false);
   const [draggedIdeaId, setDraggedIdeaId] = useState<number | null>(null);
   const [toast, setToast] = useState("");
+  const scrollRestored = useRef(false);
+
+  useEffect(() => {
+    const saveWorkspace = (scrollY = window.scrollY) => {
+      try {
+        localStorage.setItem(SAVED_WORKSPACE_KEY, JSON.stringify({ view, ticketView, ideaView, scrollY }));
+      } catch {
+        // The app remains usable when browser storage is unavailable.
+      }
+    };
+    let scrollTimer = 0;
+    const handleScroll = () => {
+      window.clearTimeout(scrollTimer);
+      scrollTimer = window.setTimeout(() => {
+        if (scrollRestored.current) saveWorkspace();
+      }, 120);
+    };
+    const handlePageHide = () => saveWorkspace();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("pagehide", handlePageHide);
+    return () => {
+      window.clearTimeout(scrollTimer);
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, [view, ticketView, ideaView]);
+
+  useEffect(() => {
+    if (loading || scrollRestored.current) return;
+    const frame = window.requestAnimationFrame(() => window.scrollTo(0, initialWorkspace.scrollY));
+    scrollRestored.current = true;
+    return () => window.cancelAnimationFrame(frame);
+  }, [initialWorkspace.scrollY, loading]);
 
   async function refreshData(showMessage = false, showLoading = true) {
     if (refreshing.current) return;
