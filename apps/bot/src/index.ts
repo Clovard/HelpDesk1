@@ -113,6 +113,8 @@ export default {
         }
 
         if (text && [MAIN_ACTIONS.myTickets, "Мои заявки", "My Tickets"].includes(text)) {
+            await env.DB.prepare("DELETE FROM bot_ticket_chats WHERE chat_id = ?")
+                .bind(String(chatId)).run();
             await handleMyTickets(
             env,
             chatId,

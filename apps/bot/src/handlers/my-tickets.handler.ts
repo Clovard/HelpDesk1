@@ -127,8 +127,11 @@ export async function startTicketChat(env: BotEnv, chatId: number, ticketId: num
     await sendTelegramMessage(
         env.BOT_TOKEN,
         chatId,
-        `Переписка по заявке ${ticket.public_id} открыта. Напишите сообщение здесь — оно появится в HelpDesk. Чтобы переключиться на другую заявку, откройте «Мои заявки».`,
-        { keyboard: [[{ text: "📋 Мои заявки" }, { text: "Завершить переписку" }]], resize_keyboard: true, one_time_keyboard: false },
+        `Переписка по заявке ${ticket.public_id} открыта. Напишите сообщение здесь — оно появится в HelpDesk. Чтобы выбрать другую заявку, нажмите кнопку возврата ниже.`,
+        { inline_keyboard: [[
+            { text: "← К списку заявок", callback_data: "ticket_list" },
+            { text: "Завершить переписку", callback_data: "ticket_end" },
+        ]] },
     );
     return true;
 }
@@ -273,6 +276,27 @@ export async function handleTicketChatCallback(
     callback: NonNullable<TelegramUpdate["callback_query"]>,
 ) {
     if (await handleTicketClosureCallback(env, callback)) return true;
+
+    if (callback.data === "ticket_end" && callback.message?.chat.type === "private") {
+        const chatId = callback.message.chat.id;
+        await env.DB.prepare("DELETE FROM bot_ticket_chats WHERE chat_id = ?")
+            .bind(String(chatId)).run();
+        await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Переписка завершена");
+        await sendTelegramMessage(env.BOT_TOKEN, chatId, "Переписка завершена. Выберите действие в меню.", getMainKeyboard());
+        return true;
+    }
+
+    if (callback.data === "ticket_list" && callback.message?.chat.type === "private") {
+        const chatId = callback.message.chat.id;
+        await env.DB.prepare("DELETE FROM bot_ticket_chats WHERE chat_id = ?")
+            .bind(String(chatId)).run();
+        const telegramUserId = String(callback.from.id);
+        const counts = await getEmployeeTicketCounts(env, telegramUserId);
+        const category: TicketCategory = counts.active ? "active" : "closed";
+        await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Возвращаю к списку заявок");
+        await showTicketPage(env, chatId, telegramUserId, category, 0, callback.message.message_id);
+        return true;
+    }
 
     const pageMatch = /^tickets_page:(active|closed):(\d+)$/.exec(callback.data ?? "");
     if (pageMatch && callback.message?.chat.type === "private") {
