@@ -2169,35 +2169,28 @@ function CreateTicketPanel({
                   required
                   value={form.city}
                   onChange={(value) => set("city", value)}
-                  options={["Новосибирск", "Москва", "Томск"]}
+                  options={["Новосибирск", "Красноярск", "Томск", "Кемерово", "Барнаул"]}
                 />
                 <SelectField
                   label="Подразделение"
                   required
                   value={form.department}
                   onChange={(value) => set("department", value)}
-                  options={[
-                    "Офис",
-                    "Продажи",
-                    "Финансы",
-                    "Кадровые службы",
-                    "Логистика",
-                    "Маркетинг",
-                  ]}
+                  options={["Офис", "Склад", "Логистика", "Закупки", "Другое"]}
                 />
-                <SelectField
+                <Field
                   label="Система"
                   required
                   value={form.system}
                   onChange={(value) => set("system", value)}
-                  options={["1С", "ПК", "Битрикс24", "WMS", "VPN", "Почта"]}
+                  placeholder="Например: 1С, почта, принтер"
                 />
                 <SelectField
                   label="Тип обращения"
                   required
                   value={form.type}
                   onChange={(value) => set("type", value)}
-                  options={["Ошибка", "Доступ", "Консультация", "Настройка"]}
+                  options={["Не работает", "Ошибка", "Доступ", "Настройка", "Оборудование", "Другое"]}
                 />
                 <SelectField
                   label="Масштаб"
