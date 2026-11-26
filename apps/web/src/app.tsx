@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { authApi, getApiUrl, helpdeskApi, normalizeTicketAssignee, saveApiUrl, ticketAssigneeForLevel, ticketLevelForAssignee, toApiStatus, toUiIdea, toUiTicket, type ApiTicketConversation, type ApiTicketMessage } from "./api";
+import { getApiUrl, helpdeskApi, normalizeTicketAssignee, saveApiUrl, ticketAssigneeForLevel, ticketLevelForAssignee, toApiStatus, toUiIdea, toUiTicket, type ApiTicketConversation, type ApiTicketMessage } from "./api";
 
 type View = "tickets" | "ideas" | "messages" | "settings";
 type TicketView = "list" | "kanban";
@@ -426,7 +426,6 @@ function downloadCsv(filename: string, headers: string[], rows: string[][]) {
 }
 
 function App() {
-  const currentUser = authApi.currentUser();
   const [initialWorkspace] = useState(readSavedWorkspace);
   const [view, setView] = useState<View>(initialWorkspace.view);
   const [ticketView, setTicketView] = useState<TicketView>(initialWorkspace.ticketView);
@@ -846,13 +845,11 @@ function App() {
             <i className={apiOnline ? "" : "offline"} />
           </div>
           <div className="profile">
-            <span className="avatar">{(currentUser?.display_name || "Сотрудник").slice(0, 1)}</span>
+            <span className="avatar">IT</span>
             <span>
-              <strong>{currentUser?.display_name || "Сотрудник"}</strong>
-              <small>{currentUser?.access_role === "Admin" ? "Администратор" : `Технический специалист · ${currentUser?.support_level || ""}`}</small>
+              <strong>Центр поддержки</strong>
+              <small>Угли IT</small>
             </span>
-            <button aria-label="Сменить пароль" title="Сменить пароль" onClick={authApi.openPasswordDialog}>Пароль</button>
-            <button aria-label="Выйти из HelpDesk" title="Выйти" onClick={authApi.requestLogout}>Выйти</button>
           </div>
         </div>
       </aside>

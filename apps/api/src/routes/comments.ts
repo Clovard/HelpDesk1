@@ -72,7 +72,7 @@ async (context) => {
         );
     }
 
-    const authorName = context.get("staff").display_name;
+    const authorName = "ИТ-поддержка";
 
     const result = await createComment(
     context.env,

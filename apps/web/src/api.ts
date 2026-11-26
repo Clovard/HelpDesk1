@@ -123,14 +123,12 @@ function formatStoredDateTime(date: string, time: string) {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = sessionStorage.getItem("ugli-helpdesk-session");
   let response: Response;
   try {
     response = await fetch(`${getApiUrl()}${path}`, {
       ...init,
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...init?.headers,
       },
     });
@@ -146,85 +144,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(`API вернул не JSON (HTTP ${response.status}): ${text.slice(0, 180)}`);
   }
   if (!response.ok || body.ok === false) {
-    const sessionExpired = [
-      "Требуется войти в HelpDesk.",
-      "Сессия завершена.",
-      "Сессия завершена. Войдите снова.",
-    ].includes(String(body.error || ""));
-    if (response.status === 401 && sessionExpired) {
-      sessionStorage.removeItem("ugli-helpdesk-session");
-      sessionStorage.removeItem("ugli-helpdesk-user");
-      window.dispatchEvent(new Event("helpdesk:session-expired"));
-    }
     throw new Error(String(body.error || `Ошибка API (HTTP ${response.status})`));
   }
   return body as T;
 }
-
-export type StaffUser = {
-  username: string;
-  display_name: string;
-  access_role: "Admin" | "Agent";
-  support_level: "L1" | "L2" | "L3";
-};
-
-export const authApi = {
-  currentUser(): StaffUser | null {
-    try {
-      return JSON.parse(sessionStorage.getItem("ugli-helpdesk-user") || "null") as StaffUser | null;
-    } catch {
-      return null;
-    }
-  },
-  saveSession(token: string, user: StaffUser) {
-    sessionStorage.setItem("ugli-helpdesk-session", token);
-    sessionStorage.setItem("ugli-helpdesk-user", JSON.stringify(user));
-  },
-  clearSession() {
-    sessionStorage.removeItem("ugli-helpdesk-session");
-    sessionStorage.removeItem("ugli-helpdesk-user");
-  },
-  status() {
-    return request<{ initialized: boolean; users: Array<{ username: string; display_name: string }> }>("/auth/status");
-  },
-  login(username: string, password: string) {
-    return request<{ token: string; user: StaffUser }>("/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ username, password }),
-    });
-  },
-  bootstrap(secret: string, passwords: Record<string, string>) {
-    return request<{ ok: boolean }>("/auth/bootstrap", {
-      method: "POST",
-      body: JSON.stringify({ bootstrapSecret: secret, passwords }),
-    });
-  },
-  me() {
-    return request<{ user: StaffUser }>("/auth/me");
-  },
-  changePassword(currentPassword: string, newPassword: string) {
-    return request<{ ok: boolean }>("/auth/change-password", {
-      method: "POST",
-      body: JSON.stringify({ currentPassword, newPassword }),
-    });
-  },
-  resetPassword(username: string, password: string) {
-    return request<{ ok: boolean }>(`/auth/accounts/${username}/password`, {
-      method: "PUT",
-      body: JSON.stringify({ password }),
-    });
-  },
-  openPasswordDialog() {
-    window.dispatchEvent(new Event("helpdesk:open-password"));
-  },
-  async logout() {
-    try { await request("/auth/logout", { method: "POST" }); } catch { /* local logout still proceeds */ }
-    this.clearSession();
-  },
-  requestLogout() {
-    window.dispatchEvent(new Event("helpdesk:logout-requested"));
-  },
-};
 
 export const helpdeskApi = {
   async health() {
