@@ -196,8 +196,7 @@ export const authApi = {
   bootstrap(secret: string, passwords: Record<string, string>) {
     return request<{ ok: boolean }>("/auth/bootstrap", {
       method: "POST",
-      headers: { "X-Bootstrap-Secret": secret },
-      body: JSON.stringify({ passwords }),
+      body: JSON.stringify({ bootstrapSecret: secret, passwords }),
     });
   },
   me() {

@@ -7,8 +7,8 @@ const auth = new Hono<AppEnv>();
 auth.get("/status", async (context) => context.json({ ok: true, ...(await getAuthStatus(context.env)) }));
 
 auth.post("/bootstrap", async (context) => {
-    const body = await context.req.json<{ passwords?: Record<string, unknown> }>();
-    const result = await initializeStaff(context.env, context.req.header("X-Bootstrap-Secret") ?? "", body.passwords ?? {});
+    const body = await context.req.json<{ bootstrapSecret?: string; passwords?: Record<string, unknown> }>();
+    const result = await initializeStaff(context.env, body.bootstrapSecret ?? "", body.passwords ?? {});
     if (!result.ok) return context.json({ ok: false, error: result.error }, 403);
     return context.json({ ok: true });
 });
