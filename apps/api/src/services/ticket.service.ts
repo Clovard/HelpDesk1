@@ -1,4 +1,5 @@
 import type { Env } from "../db/client";
+import { createTicketEvent } from "./event.service";
 
 export type CreateTicketInput = {
     employee: string;
@@ -168,8 +169,11 @@ input: CreateTicketInput,
     )
     .run();
 
+    const id = Number(result.meta.last_row_id);
+    await createTicketEvent(env, id, "ticket_created", "Заявка создана", input.employee);
+
     return {
-        id: result.meta.last_row_id,
+        id,
         publicId,
     };
 }
@@ -298,26 +302,19 @@ input: UpdateTicketInput,
     .run();
 
     if (current.status !== nextStatus) {
-        await env.DB.prepare(
-        `
-        INSERT INTO ticket_events (
-          ticket_id,
-          event_type,
-          old_value,
-          new_value,
-          author_name
-        )
-        VALUES (?, ?, ?, ?, ?)
-      `,
-        )
-        .bind(
-        id,
-        "status_changed",
-        current.status,
-        nextStatus,
-        "Helpdesk",
-        )
-        .run();
+        await createTicketEvent(env, id, "status_changed", nextStatus, "ИТ-поддержка", current.status);
+    }
+
+    if (currentAssignee !== nextAssignee) {
+        await createTicketEvent(env, id, "assignee_changed", nextAssignee || "Не назначен", "ИТ-поддержка", currentAssignee || "Не назначен");
+    }
+
+    if ((current.support_level || "") !== (nextLevel || "")) {
+        await createTicketEvent(env, id, "level_changed", nextLevel || "Не указан", "ИТ-поддержка", current.support_level || "Не указан");
+    }
+
+    if ((current.it_comment || "") !== (nextComment || "")) {
+        await createTicketEvent(env, id, "it_comment_changed", nextComment || "Комментарий удалён", "ИТ-поддержка", current.it_comment || "Комментарий отсутствовал");
     }
 
     if (current.status !== "Closed" && nextStatus === "Closed") {

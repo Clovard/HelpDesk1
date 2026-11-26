@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { getApiUrl, helpdeskApi, normalizeTicketAssignee, saveApiUrl, ticketAssigneeForLevel, ticketLevelForAssignee, toApiStatus, toUiIdea, toUiTicket, type ApiTicketConversation, type ApiTicketMessage } from "./api";
+import { getApiUrl, helpdeskApi, normalizeTicketAssignee, saveApiUrl, ticketAssigneeForLevel, ticketLevelForAssignee, toApiStatus, toUiIdea, toUiTicket, type ApiTicketConversation, type ApiTicketEvent, type ApiTicketMessage } from "./api";
 
 type View = "tickets" | "ideas" | "messages" | "settings";
 type TicketView = "list" | "kanban";
@@ -95,6 +95,40 @@ function formatTicketChatTime(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
+}
+
+function formatTicketHistoryTime(value: string) {
+  const date = new Date(`${value.replace(" ", "T")}Z`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("ru-RU", {
+    timeZone: "Asia/Novosibirsk",
+    year: "numeric",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function ticketEventText(event: ApiTicketEvent) {
+  const statusNames: Record<string, string> = {
+    New: "Новая", "Under Review": "На рассмотрении", "In Progress": "В работе", Closed: "Закрыта",
+  };
+  if (event.event_type === "ticket_created") return "Заявка создана";
+  if (event.event_type === "status_changed") {
+    const from = statusNames[event.old_value || ""] || event.old_value || "—";
+    const to = statusNames[event.new_value || ""] || event.new_value || "—";
+    return to === "В работе" ? `Заявка взята в работу (${from} → ${to})` : `Статус изменён: ${from} → ${to}`;
+  }
+  if (event.event_type === "assignee_changed") return `Ответственный изменён: ${event.old_value || "—"} → ${event.new_value || "—"}`;
+  if (event.event_type === "level_changed") return `Уровень изменён: ${event.old_value || "—"} → ${event.new_value || "—"}`;
+  if (event.event_type === "comment_added") return "Добавлен комментарий IT";
+  if (event.event_type === "it_comment_changed") return "Комментарий IT изменён";
+  return event.event_type;
+}
+
+function ticketEventAuthor(value: string) {
+  return value === "Helpdesk" ? "ИТ-поддержка" : value;
 }
 
 const statuses: TicketStatus[] = ["Новая", "На рассмотрении", "В работе", "Закрыта"];
@@ -2312,6 +2346,9 @@ function TicketPanel({
 }) {
   const [draft, setDraft] = useState(ticket);
   const [messages, setMessages] = useState<ApiTicketMessage[]>([]);
+  const [events, setEvents] = useState<ApiTicketEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
+  const [eventsError, setEventsError] = useState("");
   const [chatText, setChatText] = useState("");
   const [chatLoading, setChatLoading] = useState(true);
   const [chatSending, setChatSending] = useState(false);
@@ -2342,6 +2379,35 @@ function TicketPanel({
     };
     void refreshMessages();
     const interval = window.setInterval(() => void refreshMessages(), 4000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [ticket.id]);
+
+  useEffect(() => {
+    let active = true;
+    setEvents([]);
+    setEventsLoading(true);
+    setEventsError("");
+    const refreshEvents = async () => {
+      try {
+        const result = await helpdeskApi.ticketEvents(ticket.id);
+        if (active) {
+          setEvents((current) => current.length === result.length
+            && current.every((item, index) => item.id === result[index].id)
+            ? current
+            : result);
+          setEventsError("");
+        }
+      } catch (error) {
+        if (active) setEventsError(error instanceof Error ? error.message : "Не удалось загрузить историю.");
+      } finally {
+        if (active) setEventsLoading(false);
+      }
+    };
+    void refreshEvents();
+    const interval = window.setInterval(() => void refreshEvents(), 5000);
     return () => {
       active = false;
       window.clearInterval(interval);
@@ -2546,9 +2612,33 @@ function TicketPanel({
               onChange={(value) => set("comment", value)}
             />
           </section>
-          <section className="form-section ticket-chat-section">
+          <section className="form-section ticket-history-section">
             <div className="section-heading">
               <span>04</span>
+              <div>
+                <h3>История заявки</h3>
+                <p>Изменения статуса и ответственного</p>
+              </div>
+            </div>
+            {eventsLoading && <p className="ticket-chat-empty">Загружаем историю…</p>}
+            {eventsError && <p className="ticket-chat-error" role="alert">{eventsError}</p>}
+            {!eventsLoading && !eventsError && !events.length && <p className="ticket-chat-empty">Событий пока нет.</p>}
+            {!!events.length && <ol className="ticket-history-list">
+              {[...events].reverse().map((event) => (
+                <li key={event.id} className="ticket-history-item">
+                  <span className="ticket-history-dot" />
+                  <div>
+                    <strong>{ticketEventText(event)}</strong>
+                    <small>{ticketEventAuthor(event.author_name)}</small>
+                  </div>
+                  <time>{formatTicketHistoryTime(event.created_at)}</time>
+                </li>
+              ))}
+            </ol>}
+          </section>
+          <section className="form-section ticket-chat-section">
+            <div className="section-heading">
+              <span>05</span>
               <div>
                 <h3>Переписка с сотрудником</h3>
                 <p>Сообщения будут отправлены в Telegram сотрудника</p>

@@ -24,21 +24,24 @@ ticketId: number,
 eventType: string,
 newValue: string,
 authorName: string,
+oldValue: string | null = null,
 ) {
     await env.DB.prepare(
     `
       INSERT INTO ticket_events (
         ticket_id,
         event_type,
+        old_value,
         new_value,
         author_name
       )
-      VALUES (?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?)
     `,
     )
     .bind(
     ticketId,
     eventType,
+    oldValue,
     newValue,
     authorName,
     )

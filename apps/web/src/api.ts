@@ -54,6 +54,16 @@ export type ApiTicketMessage = {
   created_at: string;
 };
 
+export type ApiTicketEvent = {
+  id: number;
+  ticket_id: number;
+  event_type: string;
+  old_value: string | null;
+  new_value: string | null;
+  author_name: string;
+  created_at: string;
+};
+
 export type ApiTicketConversation = {
   id: number;
   public_id: string;
@@ -194,6 +204,10 @@ export const helpdeskApi = {
   async ticketMessages(id: number) {
     const result = await request<{ messages: ApiTicketMessage[] }>(`/api/tickets/${id}/messages`);
     return result.messages;
+  },
+  async ticketEvents(id: number) {
+    const result = await request<{ events: ApiTicketEvent[] }>(`/api/tickets/${id}/events`);
+    return result.events;
   },
   async ticketConversations() {
     const result = await request<{ conversations: ApiTicketConversation[] }>("/api/tickets/conversations");
