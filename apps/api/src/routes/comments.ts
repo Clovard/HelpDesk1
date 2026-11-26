@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 
-import type { Env } from "../db/client";
+import type { AppEnv } from "../db/client";
 
 import {
 createComment,
@@ -12,7 +12,7 @@ createTicketEvent,
 listTicketEvents,
 } from "../services/event.service";
 
-const comments = new Hono<{ Bindings: Env }>();
+const comments = new Hono<AppEnv>();
 
 comments.get(
 "/:ticketId/comments",
@@ -72,8 +72,7 @@ async (context) => {
         );
     }
 
-    const authorName =
-    body.authorName || "Helpdesk";
+    const authorName = context.get("staff").display_name;
 
     const result = await createComment(
     context.env,

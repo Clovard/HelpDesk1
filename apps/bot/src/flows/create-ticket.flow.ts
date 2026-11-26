@@ -4,7 +4,7 @@ import { sendTelegramMessage, type TelegramMessage } from "../telegram-client";
 import { sendToSupportChat } from "../support-chat";
 import { startTicketChat } from "../handlers/my-tickets.handler";
 
-type BotEnv = { DB: D1Database; API_URL: string; BOT_TOKEN: string; SUPPORT_CHAT_ID?: string };
+type BotEnv = { DB: D1Database; API_URL: string; BOT_TOKEN: string; BOT_API_TOKEN?: string; SUPPORT_CHAT_ID?: string };
 type TicketSessionState = "city" | "department" | "system" | "type" | "problem" | "confirmation";
 type TicketSessionData = { employee?: string; telegramId?: string; telegramUserId?: string; city?: string; department?: string; system?: string; type?: string; problem?: string };
 type TicketSession = { state: TicketSessionState; data: TicketSessionData };
@@ -103,7 +103,7 @@ export async function handleCreateTicketFlow(env: BotEnv, message: TelegramMessa
             await sendTelegramMessage(env.BOT_TOKEN, chatId, "Нажмите «✅ Да, создать» или «✖ Отмена».", getConfirmKeyboard());
             return true;
         }
-        const result = await new HelpdeskApiClient({ apiUrl: env.API_URL }).createTicket({
+        const result = await new HelpdeskApiClient({ apiUrl: env.API_URL, apiToken: env.BOT_API_TOKEN }).createTicket({
             employee: session.data.employee!, city: session.data.city, department: session.data.department,
             system: session.data.system, type: session.data.type, problem: session.data.problem!,
             employeeTelegramId: session.data.telegramId,

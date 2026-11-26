@@ -27,6 +27,8 @@ type Env = {
     DB: D1Database;
     BOT_TOKEN: string;
     API_URL: string;
+    BOT_API_TOKEN?: string;
+    TELEGRAM_WEBHOOK_SECRET?: string;
     SUPPORT_CHAT_ID?: string;
 };
 
@@ -39,6 +41,13 @@ export default {
             return new Response(
             "Бот поддержки работает",
             );
+        }
+
+        if (env.TELEGRAM_WEBHOOK_SECRET) {
+            const providedSecret = request.headers.get("X-Telegram-Bot-Api-Secret-Token") ?? "";
+            if (!constantTimeEqual(providedSecret, env.TELEGRAM_WEBHOOK_SECRET)) {
+                return new Response("Unauthorized", { status: 401 });
+            }
         }
 
         const update =
@@ -140,3 +149,10 @@ export default {
         return new Response("OK");
     },
 };
+
+function constantTimeEqual(left: string, right: string) {
+    if (left.length !== right.length) return false;
+    let mismatch = 0;
+    for (let index = 0; index < left.length; index += 1) mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index);
+    return mismatch === 0;
+}

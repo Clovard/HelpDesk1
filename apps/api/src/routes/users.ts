@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 
-import type { Env } from "../db/client";
+import type { AppEnv } from "../db/client";
 
 import {
 createUser,
@@ -9,7 +9,7 @@ listUsers,
 updateUser,
 } from "../services/user.services";
 
-const users = new Hono<{ Bindings: Env }>();
+const users = new Hono<AppEnv>();
 
 users.get("/", async (context) => {
     const result = await listUsers(context.env);

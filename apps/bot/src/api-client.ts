@@ -1,12 +1,15 @@
 export type ApiClientOptions = {
     apiUrl: string;
+    apiToken?: string;
 };
 
 export class HelpdeskApiClient {
     private readonly apiUrl: string;
+    private readonly apiToken: string;
 
     constructor(options: ApiClientOptions) {
         this.apiUrl = options.apiUrl.replace(/\/$/, "");
+        this.apiToken = options.apiToken ?? "";
     }
 
     private async readJson(response: Response) {
@@ -38,6 +41,7 @@ export class HelpdeskApiClient {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
+                ...(this.apiToken ? { "X-Bot-Api-Token": this.apiToken } : {}),
             },
             body: JSON.stringify(data),
         },
@@ -61,6 +65,7 @@ export class HelpdeskApiClient {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
+                ...(this.apiToken ? { "X-Bot-Api-Token": this.apiToken } : {}),
             },
             body: JSON.stringify(data),
         },

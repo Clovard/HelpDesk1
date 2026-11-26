@@ -1,0 +1,6 @@
+node_modules/
+**/dist/
+.wrangler/
+**/wrangler.test.toml
+apps/web/.env*
+!apps/web/.env.example

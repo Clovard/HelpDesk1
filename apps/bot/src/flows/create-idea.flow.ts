@@ -3,7 +3,7 @@ import { getChoiceKeyboard, getConfirmKeyboard, getMainKeyboard } from "../keybo
 import { sendTelegramMessage, type TelegramMessage } from "../telegram-client";
 import { sendToSupportChat } from "../support-chat";
 
-type BotEnv = { DB: D1Database; API_URL: string; BOT_TOKEN: string; SUPPORT_CHAT_ID?: string };
+type BotEnv = { DB: D1Database; API_URL: string; BOT_TOKEN: string; BOT_API_TOKEN?: string; SUPPORT_CHAT_ID?: string };
 type IdeaSessionState = "city" | "department" | "system" | "idea" | "expectedResult" | "priority" | "confirmation";
 type IdeaSessionData = {
     employee?: string;
@@ -110,7 +110,7 @@ export async function handleCreateIdeaFlow(env: BotEnv, message: TelegramMessage
             await sendTelegramMessage(env.BOT_TOKEN, chatId, "Нажмите «✅ Да, создать» или «✖ Отмена».", getConfirmKeyboard());
             return true;
         }
-        const result = await new HelpdeskApiClient({ apiUrl: env.API_URL }).createIdea({
+        const result = await new HelpdeskApiClient({ apiUrl: env.API_URL, apiToken: env.BOT_API_TOKEN }).createIdea({
             employee: session.data.employee!, city: session.data.city, department: session.data.department,
             system: session.data.system, idea: session.data.idea!, expectedResult: session.data.expectedResult,
             priority: session.data.priority,

@@ -1,8 +1,8 @@
 import { Hono } from "hono";
-import type { Env } from "../db/client";
+import type { AppEnv } from "../db/client";
 import { listTicketConversations, listTicketMessages, sendSupportTicketMessage } from "../services/ticket-message.service";
 
-const ticketMessages = new Hono<{ Bindings: Env }>();
+const ticketMessages = new Hono<AppEnv>();
 
 ticketMessages.get("/conversations", async (context) => {
     const conversations = await listTicketConversations(context.env);
@@ -34,7 +34,7 @@ ticketMessages.post("/:id/messages", async (context) => {
         return context.json({ ok: false, error: "Введите текст сообщения." }, 400);
     }
 
-    const result = await sendSupportTicketMessage(context.env, ticketId, body.message);
+    const result = await sendSupportTicketMessage(context.env, ticketId, body.message, context.get("staff").display_name);
     if (!result.ok) return context.json({ ok: false, error: result.error }, result.status as 400 | 404 | 409 | 500);
 
     return context.json({

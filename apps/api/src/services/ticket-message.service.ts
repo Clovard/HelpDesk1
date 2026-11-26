@@ -61,7 +61,7 @@ function telegramIdFromTicket(ticket: { telegram_user_id: string | null; employe
     return match?.[1] ?? null;
 }
 
-export async function sendSupportTicketMessage(env: Env, ticketId: number, body: string) {
+export async function sendSupportTicketMessage(env: Env, ticketId: number, body: string, senderName = "ИТ-поддержка") {
     const ticket = await env.DB.prepare(`
         SELECT id, public_id, employee, telegram_user_id, employee_telegram_id
         FROM tickets
@@ -85,8 +85,8 @@ export async function sendSupportTicketMessage(env: Env, ticketId: number, body:
 
     const insert = await env.DB.prepare(`
         INSERT INTO ticket_messages (ticket_id, sender_type, sender_name, body, telegram_status)
-        VALUES (?, 'support', 'ИТ-поддержка', ?, ?)
-    `).bind(ticketId, message, env.BOT_TOKEN ? "pending" : "not_configured").run();
+        VALUES (?, 'support', ?, ?, ?)
+    `).bind(ticketId, senderName, message, env.BOT_TOKEN ? "pending" : "not_configured").run();
 
     let delivered = false;
     if (env.BOT_TOKEN) {
