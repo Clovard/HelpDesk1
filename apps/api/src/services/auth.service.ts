@@ -1,7 +1,8 @@
 import type { Env, StaffAccount } from "../db/client";
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
-const PBKDF2_ITERATIONS = 310_000;
+// Cloudflare Workers Web Crypto rejects PBKDF2 iteration counts above 100,000.
+const PBKDF2_ITERATIONS = 100_000;
 
 function toHex(bytes: Uint8Array) {
     return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
