@@ -143,8 +143,9 @@ async function handleTicketClosureCallback(
     const match = /^tc:(\d+):([a-f0-9-]{36}):(yes|no)$/.exec(callback.data ?? "")
         ?? /^ticket_closed:(\d+):(yes|no)$/.exec(callback.data ?? "");
     if (!match) return false;
+    // Acknowledge immediately so Telegram clears the button spinner while D1 is queried.
+    await answerTelegramCallback(env.BOT_TOKEN, callback.id);
     if (!callback.message || callback.message.chat.type !== "private") {
-        await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Подтверждение доступно только в личном чате с ботом.");
         return true;
     }
 
@@ -180,19 +181,15 @@ async function handleTicketClosureCallback(
     }>();
 
     if (!ticket) {
-        await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Заявка не найдена в вашем аккаунте.");
         return true;
     }
     if (ticket.status !== "Closed") {
-        await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Статус заявки уже изменён.");
         return true;
     }
     if (ticket.initiator_acceptance !== "pending") {
-        await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Ваш ответ уже учтён.");
         return true;
     }
     if (ticket.closure_confirmation_token !== closureToken) {
-        await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Кнопка из старого уведомления. Отправил актуальное подтверждение ниже.");
         if (ticket.closure_confirmation_token) {
             await sendTelegramMessage(
                 env.BOT_TOKEN,
@@ -247,7 +244,6 @@ async function handleTicketClosureCallback(
     const reopened = accepted && decision === "no";
 
     if (!accepted) {
-        await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Ответ уже учтён или уведомление устарело.");
         return true;
     }
 
@@ -270,7 +266,6 @@ async function handleTicketClosureCallback(
         : reopened
             ? "❌ Вы сообщили, что проблема осталась. Заявка возвращена в работу."
             : "Ответ получен, но статус заявки уже изменился. Специалист проверит её.";
-    await answerTelegramCallback(env.BOT_TOKEN, callback.id, decision === "yes" ? "Спасибо за подтверждение" : "Передали специалисту");
     await editTelegramMessage(
         env.BOT_TOKEN,
         callback.message.chat.id,
