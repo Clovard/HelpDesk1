@@ -32,7 +32,7 @@ auth.post("/staff", async (c) => {
     const displayName = body.displayName?.trim() ?? "";
     if (!usernamePattern.test(username)) return c.json({ ok: false, error: "Логин: 3–32 символа, латинские буквы, цифры, точка, дефис или подчёркивание." }, 400);
     if (displayName.length < 2 || displayName.length > 80) return c.json({ ok: false, error: "Укажите имя (2–80 символов)." }, 400);
-    if (!body.password || body.password.length < 8 || body.password.length > 128) return c.json({ ok: false, error: "Пароль должен содержать от 8 до 128 символов." }, 400);
+    if (!body.password || body.password.length < 3 || body.password.length > 128) return c.json({ ok: false, error: "Пароль должен содержать от 3 до 128 символов." }, 400);
     if (!body.level || !["L1", "L2", "L3"].includes(body.level)) return c.json({ ok: false, error: "Выберите уровень специалиста." }, 400);
     try {
         await createStaff(c.env, { username, displayName, password: body.password, level: body.level });
@@ -44,7 +44,7 @@ auth.post("/staff", async (c) => {
 
 auth.put("/staff/:username/password", async (c) => {
     const body = await c.req.json<{ password?: string }>();
-    if (!body.password || body.password.length < 8 || body.password.length > 128) return c.json({ ok: false, error: "Пароль должен содержать от 8 до 128 символов." }, 400);
+    if (!body.password || body.password.length < 3 || body.password.length > 128) return c.json({ ok: false, error: "Пароль должен содержать от 3 до 128 символов." }, 400);
     const username = c.req.param("username");
     const result = await c.env.DB.prepare("SELECT username FROM staff_accounts WHERE username = ? AND active = 1").bind(username).first();
     if (!result) return c.json({ ok: false, error: "Пользователь не найден." }, 404);

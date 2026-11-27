@@ -2284,7 +2284,7 @@ function StaffManagement({ notify }: { notify: (message: string) => void }) {
     finally { setSaving(false); }
   }
   async function resetPassword(user: UserRow) {
-    const password = window.prompt(`Новый пароль для ${user.display_name} (не менее 8 символов):`);
+    const password = window.prompt(`Новый пароль для ${user.display_name} (не менее 3 символов):`);
     if (password === null) return;
     try { await authApi.resetStaffPassword(user.username, password); notify("Пароль изменён; старые сеансы завершены"); }
     catch (error) { notify(error instanceof Error ? error.message : "Не удалось изменить пароль"); }
@@ -2305,7 +2305,7 @@ function StaffManagement({ notify }: { notify: (message: string) => void }) {
       <form className="staff-form" onSubmit={(event) => void addUser(event)}>
         <label className="form-field"><span>Логин</span><input value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} placeholder="например, ivan" required /></label>
         <label className="form-field"><span>Имя</span><input value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} placeholder="Иван Иванов" required /></label>
-        <label className="form-field"><span>Временный пароль</span><input type="password" minLength={8} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} required /></label>
+        <label className="form-field"><span>Временный пароль</span><input type="password" minLength={3} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} required /></label>
         <label className="form-field"><span>Уровень</span><select value={form.level} onChange={(event) => setForm({ ...form, level: event.target.value })}><option value="L1">L1</option><option value="L2">L2</option><option value="L3">L3</option></select></label>
         <button className="button primary" disabled={saving}>{saving ? "Добавляем…" : "Добавить пользователя"}</button>
       </form>

@@ -26,9 +26,9 @@ function hiddenPrompt(label) {
 }
 
 try {
-  const first = await hiddenPrompt("Новый пароль для администратора andrey (минимум 8 символов): ");
+  const first = await hiddenPrompt("Новый пароль для администратора andrey (минимум 3 символа): ");
   const second = await hiddenPrompt("Повторите пароль: ");
-  if (first.length < 8 || first.length > 128) throw new Error("Пароль должен содержать от 8 до 128 символов.");
+  if (first.length < 3 || first.length > 128) throw new Error("Пароль должен содержать от 3 до 128 символов.");
   if (first !== second) throw new Error("Пароли не совпадают.");
 
   const salt = randomBytes(16).toString("hex");
