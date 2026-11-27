@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { getApiUrl, helpdeskApi, normalizeTicketAssignee, saveApiUrl, ticketAssigneeForLevel, ticketLevelForAssignee, toApiStatus, toUiIdea, toUiTicket, type ApiTicketConversation, type ApiTicketEvent, type ApiTicketMessage } from "./api";
+import { authApi, getApiUrl, getStaffUser, helpdeskApi, normalizeTicketAssignee, saveApiUrl, ticketAssigneeForLevel, ticketLevelForAssignee, toApiStatus, toUiIdea, toUiTicket, type ApiTicketConversation, type ApiTicketEvent, type ApiTicketMessage } from "./api";
 
 type View = "tickets" | "ideas" | "messages" | "settings";
 type TicketView = "list" | "kanban";
@@ -10,6 +10,36 @@ type SavedWorkspaceState = {
   scrollY: number;
 };
 const SAVED_WORKSPACE_KEY = "ugli-helpdesk-workspace";
+const NOTIFICATIONS_KEY = "ugli-helpdesk-notifications";
+const NOTIFICATION_SOUND_KEY = "ugli-helpdesk-notification-sound";
+
+type DeskNotification = {
+  id: string;
+  kind: "ticket" | "message";
+  title: string;
+  description: string;
+  ticketId: number;
+  createdAt: string;
+  unread: boolean;
+};
+
+function readNotifications(): DeskNotification[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem(NOTIFICATIONS_KEY) || "[]");
+    return Array.isArray(saved) ? saved.slice(-100) as DeskNotification[] : [];
+  } catch {
+    return [];
+  }
+}
+
+function readNotificationSoundEnabled() {
+  try {
+    return localStorage.getItem(NOTIFICATION_SOUND_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+
 function readSavedWorkspace(): SavedWorkspaceState {
   const defaults: SavedWorkspaceState = { view: "tickets", ticketView: "list", ideaView: "list", scrollY: 0 };
   try {
@@ -460,6 +490,7 @@ function downloadCsv(filename: string, headers: string[], rows: string[][]) {
 }
 
 function App() {
+  const staffUser = getStaffUser();
   const [initialWorkspace] = useState(readSavedWorkspace);
   const [view, setView] = useState<View>(initialWorkspace.view);
   const [ticketView, setTicketView] = useState<TicketView>(initialWorkspace.ticketView);
@@ -487,7 +518,84 @@ function App() {
   const [editingIdea, setEditingIdea] = useState(false);
   const [draggedIdeaId, setDraggedIdeaId] = useState<number | null>(null);
   const [toast, setToast] = useState("");
+  const [notifications, setNotifications] = useState<DeskNotification[]>(readNotifications);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(readNotificationSoundEnabled);
   const scrollRestored = useRef(false);
+  const audioContext = useRef<AudioContext | null>(null);
+  const knownTicketIds = useRef<Set<number> | null>(null);
+  const knownConversationSignatures = useRef<Map<number, string> | null>(null);
+  const soundEnabledRef = useRef(soundEnabled);
+  soundEnabledRef.current = soundEnabled;
+  const unreadNotificationCount = notifications.reduce((count, item) => count + (item.unread ? 1 : 0), 0);
+
+  function unlockAudio() {
+    if (!audioContext.current && window.AudioContext) audioContext.current = new window.AudioContext();
+    if (audioContext.current?.state === "suspended") void audioContext.current.resume();
+  }
+
+  function playNotificationSound(kind: DeskNotification["kind"]) {
+    const context = audioContext.current;
+    if (!soundEnabledRef.current || !context || context.state !== "running") return;
+    const tones = kind === "ticket"
+      ? [{ frequency: 587, start: 0 }, { frequency: 784, start: 0.16 }]
+      : [{ frequency: 880, start: 0 }, { frequency: 698, start: 0.12 }, { frequency: 880, start: 0.24 }];
+    for (const tone of tones) {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      const start = context.currentTime + tone.start;
+      oscillator.type = "sine";
+      oscillator.frequency.value = tone.frequency;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.11, start + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.15);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start(start);
+      oscillator.stop(start + 0.16);
+    }
+  }
+
+  function addNotification(kind: DeskNotification["kind"], title: string, description: string, ticketId: number) {
+    const item: DeskNotification = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      kind,
+      title,
+      description,
+      ticketId,
+      createdAt: new Date().toISOString(),
+      unread: true,
+    };
+    setNotifications((current) => [...current, item].slice(-100));
+    playNotificationSound(kind);
+  }
+
+  useEffect(() => {
+    const unlock = () => {
+      if (soundEnabledRef.current) unlockAudio();
+    };
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(notifications));
+      document.title = unreadNotificationCount
+        ? `(${unreadNotificationCount}) Угли IT — Центр поддержки`
+        : "Угли IT — Центр поддержки";
+    } catch {
+      // Keep notifications in memory if browser storage is unavailable.
+    }
+  }, [notifications, unreadNotificationCount]);
+
+  useEffect(() => {
+    try { localStorage.setItem(NOTIFICATION_SOUND_KEY, String(soundEnabled)); } catch { /* session-only preference */ }
+  }, [soundEnabled]);
 
   useEffect(() => {
     const saveWorkspace = (scrollY = window.scrollY) => {
@@ -528,6 +636,15 @@ function App() {
     try {
       const [apiTickets, apiIdeas] = await Promise.all([helpdeskApi.tickets(), helpdeskApi.ideas()]);
       const mappedTickets = apiTickets.map(toUiTicket);
+      const previousTicketIds = knownTicketIds.current;
+      if (previousTicketIds) {
+        for (const ticket of mappedTickets) {
+          if (!previousTicketIds.has(ticket.id)) {
+            addNotification("ticket", "Новая заявка", `${ticket.publicId} · ${ticket.employee}: ${ticket.problem}`, ticket.id);
+          }
+        }
+      }
+      knownTicketIds.current = new Set(mappedTickets.map((ticket) => ticket.id));
       setTickets(mappedTickets);
       setSelected((current) => current
         ? mappedTickets.find((ticket) => ticket.id === current.id) ?? current
@@ -556,6 +673,41 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    const refreshIncomingMessages = async () => {
+      try {
+        const conversations = await helpdeskApi.ticketConversations();
+        if (!active) return;
+        const previous = knownConversationSignatures.current;
+        const next = new Map<number, string>();
+        for (const conversation of conversations) {
+          const signature = `${conversation.last_message_at}|${conversation.last_sender_type}|${conversation.last_message}`;
+          next.set(conversation.id, signature);
+          if (previous?.has(conversation.id)
+            && previous.get(conversation.id) !== signature
+            && conversation.last_sender_type === "employee") {
+            addNotification(
+              "message",
+              "Новое сообщение",
+              `${conversation.public_id} · ${conversation.employee}: ${conversation.last_message}`,
+              conversation.id,
+            );
+          }
+        }
+        knownConversationSignatures.current = next;
+      } catch {
+        // Keep normal ticket refresh working if the conversation endpoint is unavailable.
+      }
+    };
+    void refreshIncomingMessages();
+    const interval = window.setInterval(() => void refreshIncomingMessages(), 10_000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, []);
+
   const visibleTickets = useMemo(() => {
     const query = search.toLowerCase().trim();
     return tickets.filter((ticket) => {
@@ -578,6 +730,23 @@ function App() {
     setSelected(ticket);
     setEditing(false);
     setPanel("details");
+  }
+
+  function markNotificationRead(id: string) {
+    setNotifications((current) => current.map((item) => item.id === id ? { ...item, unread: false } : item));
+  }
+
+  function openNotification(item: DeskNotification) {
+    markNotificationRead(item.id);
+    setNotificationsOpen(false);
+    const ticket = tickets.find((candidate) => candidate.id === item.ticketId);
+    if (ticket) openTicket(ticket);
+  }
+
+  function toggleNotificationSound() {
+    const next = !soundEnabled;
+    if (next) unlockAudio();
+    setSoundEnabled(next);
   }
 
   async function updateTicket(updated: Ticket) {
@@ -616,7 +785,9 @@ function App() {
         problem: ticket.problem,
         scale: ticket.scale,
       });
-      setTickets((current) => [toUiTicket(created), ...current]);
+      const mapped = toUiTicket(created);
+      knownTicketIds.current?.add(mapped.id);
+      setTickets((current) => [mapped, ...current]);
       setPanel(null);
       notify("Заявка создана");
     } catch (error) {
@@ -879,11 +1050,12 @@ function App() {
             <i className={apiOnline ? "" : "offline"} />
           </div>
           <div className="profile">
-            <span className="avatar">IT</span>
+            <span className="avatar">{staffUser?.displayName.slice(0, 1) || "IT"}</span>
             <span>
-              <strong>Центр поддержки</strong>
-              <small>Угли IT</small>
+              <strong>{staffUser?.displayName || "Центр поддержки"}</strong>
+              <small>{staffUser?.role === "Admin" ? "Администратор" : `Технический специалист ${staffUser?.level || ""}`}</small>
             </span>
+            <button className="profile-logout" title="Выйти" aria-label="Выйти" onClick={() => void authApi.logout()}>↪</button>
           </div>
         </div>
       </aside>
@@ -903,19 +1075,47 @@ function App() {
             <span className="today">
               Сегодня, {new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" }).format(today)}
             </span>
-            <button className="icon-round" aria-label="Уведомления">
-              <span className="bell-dot" />
-              <svg
-                width="19"
-                height="19"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
+            <div className="notification-wrap">
+              <button
+                className="icon-round"
+                aria-label={unreadNotificationCount ? `Уведомления, непрочитано: ${unreadNotificationCount}` : "Уведомления"}
+                aria-expanded={notificationsOpen}
+                onClick={() => setNotificationsOpen((open) => !open)}
               >
-                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4" />
-              </svg>
-            </button>
+                {unreadNotificationCount > 0 && <span className="notification-badge">{unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}</span>}
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4" />
+                </svg>
+              </button>
+              {notificationsOpen && <section className="notification-popover" aria-label="Центр уведомлений">
+                <header className="notification-header">
+                  <div>
+                    <strong>Уведомления</strong>
+                    <small>{unreadNotificationCount} непрочитано</small>
+                  </div>
+                  <button className="notification-read-all" disabled={!unreadNotificationCount} onClick={() => setNotifications((current) => current.map((item) => ({ ...item, unread: false })))}>Прочитать все</button>
+                </header>
+                <div className="notification-controls">
+                  <span>Звуковые сигналы</span>
+                  <button className={soundEnabled ? "sound-toggle enabled" : "sound-toggle"} onClick={toggleNotificationSound}>
+                    {soundEnabled ? "Включены" : "Выключены"}
+                  </button>
+                </div>
+                <div className="notification-list">
+                  {!notifications.length && <p className="notification-empty">Новых событий пока нет.</p>}
+                  {[...notifications].reverse().map((item) => (
+                    <button key={item.id} className={`notification-item ${item.unread ? "unread" : ""}`} onClick={() => openNotification(item)}>
+                      <span className={`notification-item-icon ${item.kind}`}><Icon name={item.kind === "ticket" ? "tickets" : "messages"} size={15} /></span>
+                      <span className="notification-item-copy">
+                        <strong>{item.title}</strong>
+                        <small>{item.description}</small>
+                      </span>
+                      <time>{new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" }).format(new Date(item.createdAt))}</time>
+                    </button>
+                  ))}
+                </div>
+              </section>}
+            </div>
           </div>
         </header>
 
@@ -955,7 +1155,7 @@ function App() {
         )}
         {view === "messages" && <MessagesPage />}
         {view === "settings" && (
-          <SettingsPage notify={notify} apiUrl={getApiUrl()} apiOnline={apiOnline} onSaveApiUrl={saveApiUrl} onRefresh={() => void refreshData(true)} />
+          <SettingsPage notify={notify} apiUrl={getApiUrl()} apiOnline={apiOnline} onSaveApiUrl={saveApiUrl} onRefresh={() => void refreshData(true)} isAdmin={staffUser?.role === "Admin"} />
         )}
       </main>
 
@@ -1927,12 +2127,14 @@ function SettingsPage({
   apiOnline,
   onSaveApiUrl,
   onRefresh,
+  isAdmin,
 }: {
   notify: (message: string) => void;
   apiUrl: string;
   apiOnline: boolean;
   onSaveApiUrl: (value: string) => string;
   onRefresh: () => void;
+  isAdmin: boolean;
 }) {
   const [apiUrl, setApiUrl] = useState(savedApiUrl);
   const [apiChecking, setApiChecking] = useState(false);
@@ -1969,6 +2171,7 @@ function SettingsPage({
         </div>
       </div>
       <div className="settings-grid">
+        {isAdmin && <StaffManagement notify={notify} />}
         <section className="settings-card">
           <header>
             <span className="settings-icon api">
@@ -2058,6 +2261,56 @@ function SettingsPage({
       </div>
     </div>
   );
+}
+
+function StaffManagement({ notify }: { notify: (message: string) => void }) {
+  type UserRow = { username: string; display_name: string; access_role: string; support_level: string; active: number };
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [loadError, setLoadError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ username: "", displayName: "", password: "", level: "L1" });
+  async function load() {
+    try { setUsers(await authApi.staff() as UserRow[]); setLoadError(""); }
+    catch (error) { setLoadError(error instanceof Error ? error.message : "Не удалось загрузить пользователей."); }
+  }
+  useEffect(() => { void load(); }, []);
+  async function addUser(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setSaving(true);
+    try {
+      await authApi.createStaff(form);
+      setForm({ username: "", displayName: "", password: "", level: "L1" });
+      notify("Пользователь добавлен"); await load();
+    } catch (error) { notify(error instanceof Error ? error.message : "Не удалось добавить пользователя"); }
+    finally { setSaving(false); }
+  }
+  async function resetPassword(user: UserRow) {
+    const password = window.prompt(`Новый пароль для ${user.display_name} (не менее 8 символов):`);
+    if (password === null) return;
+    try { await authApi.resetStaffPassword(user.username, password); notify("Пароль изменён; старые сеансы завершены"); }
+    catch (error) { notify(error instanceof Error ? error.message : "Не удалось изменить пароль"); }
+  }
+  async function disable(user: UserRow) {
+    if (!window.confirm(`Отключить учётную запись «${user.display_name}»?`)) return;
+    try { await authApi.deactivateStaff(user.username); notify("Учётная запись отключена"); await load(); }
+    catch (error) { notify(error instanceof Error ? error.message : "Не удалось отключить пользователя"); }
+  }
+  return <section className="settings-card staff-management">
+    <header><span className="settings-icon api">👥</span><span><h2>Пользователи</h2><p>Добавляйте сотрудников и управляйте доступом</p></span></header>
+    <div className="settings-body">
+      {loadError && <p className="auth-error">{loadError}</p>}
+      <div className="staff-list">{users.map((user) => <div className="staff-row" key={user.username}>
+        <span><strong>{user.display_name}</strong><small>{user.username} · {user.access_role === "Admin" ? "Администратор" : `Специалист ${user.support_level}`}{!user.active && " · Отключён"}</small></span>
+        <span className="staff-actions"><button className="button secondary" onClick={() => void resetPassword(user)}>Пароль</button>{user.access_role !== "Admin" && user.active === 1 && <button className="button secondary" onClick={() => void disable(user)}>Отключить</button>}</span>
+      </div>)}</div>
+      <form className="staff-form" onSubmit={(event) => void addUser(event)}>
+        <label className="form-field"><span>Логин</span><input value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} placeholder="например, ivan" required /></label>
+        <label className="form-field"><span>Имя</span><input value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} placeholder="Иван Иванов" required /></label>
+        <label className="form-field"><span>Временный пароль</span><input type="password" minLength={8} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} required /></label>
+        <label className="form-field"><span>Уровень</span><select value={form.level} onChange={(event) => setForm({ ...form, level: event.target.value })}><option value="L1">L1</option><option value="L2">L2</option><option value="L3">L3</option></select></label>
+        <button className="button primary" disabled={saving}>{saving ? "Добавляем…" : "Добавить пользователя"}</button>
+      </form>
+    </div>
+  </section>;
 }
 
 function ExportPeriodPanel({

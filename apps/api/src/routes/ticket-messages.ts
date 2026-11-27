@@ -34,7 +34,7 @@ ticketMessages.post("/:id/messages", async (context) => {
         return context.json({ ok: false, error: "Введите текст сообщения." }, 400);
     }
 
-    const result = await sendSupportTicketMessage(context.env, ticketId, body.message, "ИТ-поддержка");
+    const result = await sendSupportTicketMessage(context.env, ticketId, body.message, context.get("staff").display_name);
     if (!result.ok) return context.json({ ok: false, error: result.error }, result.status as 400 | 404 | 409 | 500);
 
     return context.json({

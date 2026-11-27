@@ -19,6 +19,19 @@ export function ticketAssigneeForLevel(level: string) {
 
 const defaultApiUrl = import.meta.env.VITE_API_URL || "https://helpdesk-api.andrejsarafonov.workers.dev";
 const apiUrlKey = "ugli-helpdesk-api-url";
+const authTokenKey = "ugli-helpdesk-session";
+const staffUserKey = "ugli-helpdesk-user";
+
+export type StaffUser = { username: string; displayName: string; role: "Admin" | "Agent"; level: "L1" | "L2" | "L3" };
+export const getStaffUser = (): StaffUser | null => {
+  try { return JSON.parse(localStorage.getItem(staffUserKey) || "null") as StaffUser | null; } catch { return null; }
+};
+export const getAuthToken = () => localStorage.getItem(authTokenKey) || "";
+export function clearAuthSession() {
+  localStorage.removeItem(authTokenKey);
+  localStorage.removeItem(staffUserKey);
+  window.dispatchEvent(new Event("helpdesk-auth-expired"));
+}
 
 export type ApiTicket = {
   id: number;
@@ -139,6 +152,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...init,
       headers: {
         "Content-Type": "application/json",
+        ...(getAuthToken() ? { Authorization: `Bearer ${getAuthToken()}` } : {}),
         ...init?.headers,
       },
     });
@@ -154,10 +168,34 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(`API вернул не JSON (HTTP ${response.status}): ${text.slice(0, 180)}`);
   }
   if (!response.ok || body.ok === false) {
+    if (response.status === 401 && path !== "/auth/login") clearAuthSession();
     throw new Error(String(body.error || `Ошибка API (HTTP ${response.status})`));
   }
   return body as T;
 }
+
+export const authApi = {
+  async login(username: string, password: string) {
+    const result = await request<{ token: string; user: StaffUser }>("/auth/login", { method: "POST", body: JSON.stringify({ username, password }) });
+    localStorage.setItem(authTokenKey, result.token);
+    localStorage.setItem(staffUserKey, JSON.stringify(result.user));
+    return result.user;
+  },
+  async logout() {
+    try { await request("/auth/logout", { method: "POST" }); } finally { clearAuthSession(); }
+  },
+  async me() { return (await request<{ user: StaffUser }>("/auth/me")).user; },
+  async staff() { return (await request<{ users: Array<{ username: string; display_name: string; access_role: string; support_level: string; active: number }> }>("/auth/staff")).users; },
+  async createStaff(input: { username: string; displayName: string; password: string; level: string }) {
+    return request("/auth/staff", { method: "POST", body: JSON.stringify(input) });
+  },
+  async resetStaffPassword(username: string, password: string) {
+    return request(`/auth/staff/${encodeURIComponent(username)}/password`, { method: "PUT", body: JSON.stringify({ password }) });
+  },
+  async deactivateStaff(username: string) {
+    return request(`/auth/staff/${encodeURIComponent(username)}`, { method: "DELETE" });
+  },
+};
 
 export const helpdeskApi = {
   async health() {

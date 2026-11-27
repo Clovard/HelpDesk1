@@ -106,6 +106,7 @@ tickets.patch("/:id", async (context) => {
     context.env,
     id,
     body,
+    context.get("staff").display_name,
     );
 
     if (!ticket) {
