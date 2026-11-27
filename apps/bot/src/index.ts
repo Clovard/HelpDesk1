@@ -57,7 +57,15 @@ export default {
         if (update.callback_query) {
             // Answer before any DB work so every inline button stops spinning immediately.
             await answerTelegramCallback(env.BOT_TOKEN, update.callback_query.id);
-            await handleTicketChatCallback(env, update.callback_query);
+            try {
+                await handleTicketChatCallback(env, update.callback_query);
+            } catch (error) {
+                console.error("Telegram callback processing failed", error);
+                const chatId = update.callback_query.message?.chat.id;
+                if (chatId !== undefined) {
+                    await sendTelegramMessage(env.BOT_TOKEN, chatId, "Не удалось обработать нажатие. Ответ не сохранён; попробуйте ещё раз чуть позже.");
+                }
+            }
             return new Response("OK");
         }
 

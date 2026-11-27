@@ -179,12 +179,16 @@ async function handleTicketClosureCallback(
     }>();
 
     if (!ticket) {
+        await sendTelegramMessage(env.BOT_TOKEN, callback.message.chat.id, "Не нашёл эту заявку среди ваших. Напишите /start и откройте последнее уведомление о закрытии.");
         return true;
     }
     if (ticket.status !== "Closed") {
+        await sendTelegramMessage(env.BOT_TOKEN, callback.message.chat.id, `Статус заявки ${ticket.public_id} уже изменился. Сейчас: ${ticket.status}.`);
         return true;
     }
     if (ticket.initiator_acceptance !== "pending") {
+        const answer = ticket.initiator_acceptance === "accepted" ? "Вы уже подтвердили, что проблема решена." : "Вы уже ответили, что проблема осталась.";
+        await sendTelegramMessage(env.BOT_TOKEN, callback.message.chat.id, `${answer} (${ticket.public_id})`);
         return true;
     }
     if (ticket.closure_confirmation_token !== closureToken) {
@@ -242,6 +246,7 @@ async function handleTicketClosureCallback(
     const reopened = accepted && decision === "no";
 
     if (!accepted) {
+        await sendTelegramMessage(env.BOT_TOKEN, callback.message.chat.id, `Ответ по заявке ${ticket.public_id} не сохранён: статус уже изменился. Обновите сообщение о закрытии.`);
         return true;
     }
 
