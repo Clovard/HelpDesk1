@@ -1,4 +1,4 @@
-import { answerTelegramCallback, editTelegramMessage, sendTelegramMessage, type TelegramUpdate } from "../telegram-client";
+import { editTelegramMessage, sendTelegramMessage, type TelegramUpdate } from "../telegram-client";
 import { getMainKeyboard } from "../keyboards/main.keyboard";
 
 type BotEnv = {
@@ -143,8 +143,6 @@ async function handleTicketClosureCallback(
     const match = /^tc:(\d+):([a-f0-9-]{36}):(yes|no)$/.exec(callback.data ?? "")
         ?? /^ticket_closed:(\d+):(yes|no)$/.exec(callback.data ?? "");
     if (!match) return false;
-    // Acknowledge immediately so Telegram clears the button spinner while D1 is queried.
-    await answerTelegramCallback(env.BOT_TOKEN, callback.id);
     if (!callback.message || callback.message.chat.type !== "private") {
         return true;
     }
@@ -287,7 +285,6 @@ export async function handleTicketChatCallback(
         const chatId = callback.message.chat.id;
         await env.DB.prepare("DELETE FROM bot_ticket_chats WHERE chat_id = ?")
             .bind(String(chatId)).run();
-        await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Переписка завершена");
         await sendTelegramMessage(env.BOT_TOKEN, chatId, "Переписка завершена. Выберите действие в меню.", getMainKeyboard());
         return true;
     }
@@ -299,14 +296,12 @@ export async function handleTicketChatCallback(
         const telegramUserId = String(callback.from.id);
         const counts = await getEmployeeTicketCounts(env, telegramUserId);
         const category: TicketCategory = counts.active ? "active" : "closed";
-        await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Возвращаю к списку заявок");
         await showTicketPage(env, chatId, telegramUserId, category, 0, callback.message.message_id);
         return true;
     }
 
     const pageMatch = /^tickets_page:(active|closed):(\d+)$/.exec(callback.data ?? "");
     if (pageMatch && callback.message?.chat.type === "private") {
-        await answerTelegramCallback(env.BOT_TOKEN, callback.id);
         await showTicketPage(
             env,
             callback.message.chat.id,
@@ -344,11 +339,9 @@ export async function handleTicketChatCallback(
     ).first<{ id: number; public_id: string }>();
 
     if (!ticket) {
-        await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Эта заявка не найдена в вашем аккаунте.");
         return true;
     }
 
-    await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Переписка открыта");
     await startTicketChat(env, chatId, ticket.id);
     return true;
 }

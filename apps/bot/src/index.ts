@@ -18,6 +18,7 @@ handleCreateIdeaFlow,
 } from "./flows/create-idea.flow";
 
 import {
+answerTelegramCallback,
 sendTelegramMessage,
 type TelegramUpdate,
 } from "./telegram-client";
@@ -54,6 +55,8 @@ export default {
         await request.json<TelegramUpdate>();
 
         if (update.callback_query) {
+            // Answer before any DB work so every inline button stops spinning immediately.
+            await answerTelegramCallback(env.BOT_TOKEN, update.callback_query.id);
             await handleTicketChatCallback(env, update.callback_query);
             return new Response("OK");
         }
