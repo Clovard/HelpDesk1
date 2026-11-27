@@ -192,7 +192,18 @@ async function handleTicketClosureCallback(
         return true;
     }
     if (ticket.closure_confirmation_token !== closureToken) {
-        await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Это уведомление уже устарело. Откройте последнее сообщение о закрытии заявки.");
+        await answerTelegramCallback(env.BOT_TOKEN, callback.id, "Кнопка из старого уведомления. Отправил актуальное подтверждение ниже.");
+        if (ticket.closure_confirmation_token) {
+            await sendTelegramMessage(
+                env.BOT_TOKEN,
+                callback.message.chat.id,
+                `Заявка ${ticket.public_id} закрыта. Подтвердите, пожалуйста, проблема решена?`,
+                { inline_keyboard: [
+                    [{ text: "✅ Да, проблема решена", callback_data: `tc:${ticket.id}:${ticket.closure_confirmation_token}:yes` }],
+                    [{ text: "❌ Нет, проблема осталась", callback_data: `tc:${ticket.id}:${ticket.closure_confirmation_token}:no` }],
+                ] },
+            );
+        }
         return true;
     }
 

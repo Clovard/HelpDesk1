@@ -2113,7 +2113,7 @@ function IdeaPanel({
               <SelectField label="Приоритет" value={draft.priority} disabled={!editing} onChange={(value) => set("priority", value)} options={["Низкий", "Средний", "Высокий"]} />
               <SelectField label="Ответственный" value={draft.assignee} disabled={!editing} onChange={(value) => set("assignee", value)} options={["Не назначен", "Андрей", "Тёма", "Пентагон"]} />
             </div>
-            <DetailField label="Комментарий IT" value={draft.comment || "Комментарий пока не добавлен"} editing={editing} textarea onChange={(value) => set("comment", value)} />
+            <DetailField label="Комментарий IT" value={draft.comment} editing={editing} textarea onChange={(value) => set("comment", value)} />
           </section>
         </div>
       </aside>
@@ -2859,7 +2859,7 @@ function TicketPanel({
             </div>
             <DetailField
               label="Комментарий IT"
-              value={draft.comment || "Комментарий пока не добавлен"}
+              value={draft.comment}
               editing={editing}
               textarea
               onChange={(value) => set("comment", value)}
@@ -3028,7 +3028,7 @@ function DetailField({
       <span>{label}</span>
       {editing ? (
         textarea ? (
-          <textarea value={value} onChange={(event) => onChange?.(event.target.value)} />
+          <textarea value={value} placeholder={label === "Комментарий IT" ? "Добавьте комментарий…" : undefined} onChange={(event) => onChange?.(event.target.value)} />
         ) : (
           <input value={value} onChange={(event) => onChange?.(event.target.value)} />
         )
