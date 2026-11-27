@@ -34,6 +34,7 @@ export async function listTicketConversations(env: Env) {
             t.telegram_user_id,
             t.problem,
             t.status,
+            (SELECT m.id FROM ticket_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_message_id,
             COALESCE((SELECT m.body FROM ticket_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC, m.id DESC LIMIT 1), '') AS last_message,
             (SELECT m.sender_type FROM ticket_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_sender_type,
             COALESCE((SELECT m.created_at FROM ticket_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC, m.id DESC LIMIT 1), t.created_at) AS last_message_at

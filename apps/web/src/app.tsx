@@ -520,6 +520,7 @@ function App() {
   const [toast, setToast] = useState("");
   const [notifications, setNotifications] = useState<DeskNotification[]>(readNotifications);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [desktopPermission, setDesktopPermission] = useState(() => typeof Notification === "undefined" ? "unsupported" : Notification.permission);
   const [soundEnabled, setSoundEnabled] = useState(readNotificationSoundEnabled);
   const scrollRestored = useRef(false);
   const audioContext = useRef<AudioContext | null>(null);
@@ -568,6 +569,18 @@ function App() {
     };
     setNotifications((current) => [...current, item].slice(-100));
     playNotificationSound(kind);
+    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      new Notification(title, { body: description, icon: "/ugli-logo.png", tag: `${kind}-${ticketId}-${item.id}` });
+    }
+  }
+
+  async function enableDesktopNotifications() {
+    if (typeof Notification === "undefined") {
+      setDesktopPermission("unsupported");
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    setDesktopPermission(permission);
   }
 
   useEffect(() => {
@@ -682,7 +695,7 @@ function App() {
         const previous = knownConversationSignatures.current;
         const next = new Map<number, string>();
         for (const conversation of conversations) {
-          const signature = `${conversation.last_message_at}|${conversation.last_sender_type}|${conversation.last_message}`;
+          const signature = `${conversation.last_message_id ?? ""}|${conversation.last_message_at}|${conversation.last_sender_type}|${conversation.last_message}`;
           next.set(conversation.id, signature);
           if (previous?.has(conversation.id)
             && previous.get(conversation.id) !== signature
@@ -788,6 +801,7 @@ function App() {
       const mapped = toUiTicket(created);
       knownTicketIds.current?.add(mapped.id);
       setTickets((current) => [mapped, ...current]);
+      addNotification("ticket", "Новая заявка", `${mapped.publicId} · ${mapped.employee}: ${mapped.problem}`, mapped.id);
       setPanel(null);
       notify("Заявка создана");
     } catch (error) {
@@ -1101,6 +1115,10 @@ function App() {
                     {soundEnabled ? "Включены" : "Выключены"}
                   </button>
                 </div>
+                {desktopPermission !== "granted" && <div className="notification-controls">
+                  <span>{desktopPermission === "unsupported" ? "Браузер не поддерживает всплывающие уведомления" : desktopPermission === "denied" ? "Разрешение запрещено в настройках браузера" : "Показывать уведомления поверх окон"}</span>
+                  {desktopPermission === "default" && <button className="sound-toggle enabled" onClick={() => void enableDesktopNotifications()}>Разрешить</button>}
+                </div>}
                 <div className="notification-list">
                   {!notifications.length && <p className="notification-empty">Новых событий пока нет.</p>}
                   {[...notifications].reverse().map((item) => (

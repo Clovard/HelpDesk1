@@ -85,6 +85,7 @@ export type ApiTicketConversation = {
   telegram_user_id: string | null;
   problem: string;
   status: string;
+  last_message_id: number | null;
   last_message: string;
   last_sender_type: "employee" | "support" | null;
   last_message_at: string;
