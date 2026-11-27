@@ -54,11 +54,25 @@ export default {
         const update =
         await request.json<TelegramUpdate>();
 
+        console.info("Telegram update received", {
+            updateId: update.update_id,
+            type: update.callback_query ? "callback_query" : update.message ? "message" : "other",
+            callbackKind: update.callback_query?.data?.split(":", 1)[0],
+            callbackAction: update.callback_query?.data?.split(":").at(-1),
+        });
+
         if (update.callback_query) {
-            // Answer before any DB work so every inline button stops spinning immediately.
-            await answerTelegramCallback(env.BOT_TOKEN, update.callback_query.id);
+            // Acknowledge quickly, but still process the action if Telegram's acknowledgement call fails.
             try {
-                await handleTicketChatCallback(env, update.callback_query);
+                await answerTelegramCallback(env.BOT_TOKEN, update.callback_query.id);
+            } catch (error) {
+                console.error("Telegram callback acknowledgement failed", error);
+            }
+            try {
+                const handled = await handleTicketChatCallback(env, update.callback_query);
+                if (!handled && update.callback_query.message?.chat.id !== undefined) {
+                    await sendTelegramMessage(env.BOT_TOKEN, update.callback_query.message.chat.id, "Эта кнопка устарела или больше не поддерживается. Откройте актуальное сообщение и попробуйте ещё раз.");
+                }
             } catch (error) {
                 console.error("Telegram callback processing failed", error);
                 const chatId = update.callback_query.message?.chat.id;
