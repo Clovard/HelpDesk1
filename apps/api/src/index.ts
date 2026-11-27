@@ -38,7 +38,7 @@ app.use("/api/*", async (context, next) => {
     const path = new URL(context.req.url).pathname;
     const botCreate = context.req.method === "POST" && ["/api/tickets", "/api/ideas"].includes(path);
     const botToken = context.req.header("X-Bot-Api-Token");
-    if (botCreate && context.env.BOT_API_TOKEN && botToken === context.env.BOT_API_TOKEN) return next();
+    if (botCreate && botToken && [context.env.BOT_API_TOKEN, context.env.BOT_TOKEN].some((secret) => secret && botToken === secret)) return next();
 
     const token = context.req.header("Authorization")?.replace(/^Bearer\s+/i, "");
     const staff = token ? await authenticate(context.env, token) : null;

@@ -103,7 +103,7 @@ export async function handleCreateTicketFlow(env: BotEnv, message: TelegramMessa
             await sendTelegramMessage(env.BOT_TOKEN, chatId, "Нажмите «✅ Да, создать» или «✖ Отмена».", getConfirmKeyboard());
             return true;
         }
-        const result = await new HelpdeskApiClient({ apiUrl: env.API_URL, apiToken: env.BOT_API_TOKEN }).createTicket({
+        const result = await new HelpdeskApiClient({ apiUrl: env.API_URL, apiToken: env.BOT_API_TOKEN || env.BOT_TOKEN }).createTicket({
             employee: session.data.employee!, city: session.data.city, department: session.data.department,
             system: session.data.system, type: session.data.type, problem: session.data.problem!,
             employeeTelegramId: session.data.telegramId,

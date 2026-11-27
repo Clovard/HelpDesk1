@@ -110,7 +110,7 @@ export async function handleCreateIdeaFlow(env: BotEnv, message: TelegramMessage
             await sendTelegramMessage(env.BOT_TOKEN, chatId, "Нажмите «✅ Да, создать» или «✖ Отмена».", getConfirmKeyboard());
             return true;
         }
-        const result = await new HelpdeskApiClient({ apiUrl: env.API_URL, apiToken: env.BOT_API_TOKEN }).createIdea({
+        const result = await new HelpdeskApiClient({ apiUrl: env.API_URL, apiToken: env.BOT_API_TOKEN || env.BOT_TOKEN }).createIdea({
             employee: session.data.employee!, city: session.data.city, department: session.data.department,
             system: session.data.system, idea: session.data.idea!, expectedResult: session.data.expectedResult,
             priority: session.data.priority,
