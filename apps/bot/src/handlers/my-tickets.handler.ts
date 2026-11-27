@@ -193,9 +193,10 @@ async function handleTicketClosureCallback(
     }
     if (ticket.closure_confirmation_token !== closureToken) {
         if (ticket.closure_confirmation_token) {
-            await sendTelegramMessage(
+            await editTelegramMessage(
                 env.BOT_TOKEN,
                 callback.message.chat.id,
+                callback.message.message_id,
                 `Заявка ${ticket.public_id} закрыта. Подтвердите, пожалуйста, проблема решена?`,
                 { inline_keyboard: [
                     [{ text: "✅ Да, проблема решена", callback_data: `tc:${ticket.id}:${ticket.closure_confirmation_token}:yes` }],
@@ -276,7 +277,6 @@ async function handleTicketClosureCallback(
         `${callback.message.text ?? `Заявка ${ticket.public_id}` }\n\n${resultText}`,
         { inline_keyboard: [] },
     );
-    await sendTelegramMessage(env.BOT_TOKEN, callback.message.chat.id, resultText, getMainKeyboard());
     return true;
 }
 
